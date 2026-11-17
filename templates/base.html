@@ -1,0 +1,52 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Зоомагазин — ІС{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <h3>🐾 ZooSystem</h3>
+            {% if account %}
+                <span>{{ account.employee.full_name }}</span>
+                <span>Роль: <strong>{{ account.role.name }}</strong></span>
+            {% endif %}
+        </div>
+
+        <ul class="sidebar-nav">
+            {% if account.role.name == 'директор' %}
+                <li><a href="{% url 'director_dashboard' %}">📊 Аналітика та зведення</a></li>
+                <li><a href="{% url 'director_employees' %}">👥 Персонал та доступи</a></li>
+                <li><a href="{% url 'director_stores' %}">🏪 Магазини та склади</a></li>
+                <li><a href="{% url 'director_salaries' %}">💳 Відомість зарплат</a></li>
+            {% elif account.role.name == 'продавець-консультант' %}
+                <li><a href="{% url 'cashier_dashboard' %}">🖥️ Касова зміна</a></li>
+                <li><a href="{% url 'create_sale' %}">🛒 Новий продаж (Чек)</a></li>
+                <li><a href="{% url 'process_return' %}">↩️ Повернення товару</a></li>
+                <li><a href="{% url 'manage_customers' %}">🐾 Клієнти та знижки</a></li>
+                <li><a href="{% url 'price_control' %}">🏷️ Коригування цін</a></li>
+            {% endif %}
+        </ul>
+
+        <div class="sidebar-footer">
+            <a href="{% url 'logout' %}" class="btn btn-secondary btn-block">Вийти з системи</a>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+</div>
+</body>
+</html>

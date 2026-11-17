@@ -1,0 +1,27 @@
+# Віртуальне середовище (містить Include, Lib, Scripts, pyvenv.cfg)
+.venv/
+venv/
+env/
+
+# Кеш Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Налаштування IDE (PyCharm / VS Code)
+.idea/
+.vscode/
+
+# База даних SQLite (якщо з'явиться під час локальної розробки)
+*.sqlite3
+db.sqlite3
+
+# Змінні середовища (паролі, SECRET_KEY, доступи до БД)
+.env
+
+# Зібрана статика (після команди collectstatic)
+staticfiles/
+
+# Системні файли Windows
+Thumbs.db
+Desktop.ini
