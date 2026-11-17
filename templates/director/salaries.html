@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Відомість зарплат{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Відомість нарахованих зарплат</h1>
+</div>
+
+<div class="stats-grid" style="max-width: 340px;">
+    <div class="stat-card">
+        <div class="label">Загальний фонд виплат</div>
+        <div class="value">{{ total_payroll }} ₴</div>
+    </div>
+</div>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Період (місяць)</th>
+                <th>Співробітник</th>
+                <th>Посада</th>
+                <th>Ставка</th>
+                <th>Премія</th>
+                <th>Разом до виплати</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sal in salaries %}
+            <tr>
+                <td>{{ sal.period_month|date:"m.Y" }}</td>
+                <td><strong>{{ sal.employee.full_name }}</strong></td>
+                <td>{{ sal.employee.position }}</td>
+                <td>{{ sal.base_amount }} ₴</td>
+                <td>{{ sal.bonus }} ₴</td>
+                <td><strong>{{ sal.total }} ₴</strong></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6">Записів про нарахування ще немає.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}Новий чек{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Оформлення продажу</h1>
+</div>
+
+<div class="card">
+    <form method="POST">
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-group">
+                <label>Постійний клієнт (для застосування знижки)</label>
+                <select name="customer_id" class="form-control">
+                    <option value="">-- Без картки клієнта (0%) --</option>
+                    {% for c in customers %}
+                        <option value="{{ c.id }}">{{ c.full_name }} ({{ c.phone }}) — Знижка {{ c.discount_percent }}%</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Спосіб оплати</label>
+                <select name="payment_method" class="form-control" required>
+                    <option value="картка">Банківська картка</option>
+                    <option value="готівка">Готівка</option>
+                    <option value="змішана">Змішана оплата</option>
+                </select>
+            </div>
+        </div>
+
+        <h3 style="margin-top: 16px;">Позиції в чеку</h3>
+        <div id="items-container">
+            <div class="form-row item-row" style="margin-bottom: 10px;">
+                <div class="form-group">
+                    <label>Товар</label>
+                    <select name="product_id[]" class="form-control" required>
+                        {% for p in products %}
+                            <option value="{{ p.id }}">{{ p.name }} — {{ p.sale_price }} ₴ (Залишок: {{ p.stock_quantity }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="max-width: 150px;">
+                    <label>Кількість</label>
+                    <input type="number" name="quantity[]" class="form-control" value="1" min="1" required>
+                </div>
+            </div>
+        </div>
+
+        <button type="button" class="btn btn-secondary" onclick="addRow()" style="margin-bottom: 20px;">+ Додати ще товар</button>
+        <br>
+        <button type="submit" class="btn btn-primary">Провести чек та списати зі складу</button>
+    </form>
+</div>
+
+<script>
+function addRow() {
+    const container = document.getElementById('items-container');
+    const firstRow = container.querySelector('.item-row');
+    const newRow = firstRow.cloneNode(true);
+    newRow.querySelector('input').value = 1;
+    container.appendChild(newRow);
+}
+</script>
+{% endblock %}

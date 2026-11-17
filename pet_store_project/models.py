@@ -41,20 +41,6 @@ class Customer(models.Model):
     def __str__(self):
         return f"{self.full_name} ({self.phone})"
 
-
-class Employee(models.Model):
-    full_name = models.CharField(max_length=150)
-    position = models.CharField(max_length=50)
-    phone = models.CharField(max_length=20)
-
-    class Meta:
-        managed = False
-        db_table = 'employee'
-
-    def __str__(self):
-        return self.full_name
-
-
 class Store(models.Model):
     name = models.CharField(max_length=100)
     address = models.CharField(max_length=255, blank=True, null=True)
@@ -67,6 +53,18 @@ class Store(models.Model):
     def __str__(self):
         return f"{self.name} ({self.type})"
 
+class Employee(models.Model):
+    full_name = models.CharField(max_length=150)
+    position = models.CharField(max_length=50)
+    phone = models.CharField(max_length=20)
+    store = models.ForeignKey(Store, on_delete=models.SET_NULL, null=True, blank=True, db_column='store_id')
+
+    class Meta:
+        managed = False
+        db_table = 'employee'
+
+    def __str__(self):
+        return self.full_name
 
 class RoleInStore(models.Model):
     name = models.CharField(max_length=50, unique=True)

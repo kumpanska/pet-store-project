@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block title %}Панель директора{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Аналітика та зведення</h1>
+</div>
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="label">Виручка за сьогодні</div>
+        <div class="value">{{ sales_today.total_sum|floatformat:2 }} ₴</div>
+        <small style="color: #575C55;">Чеків: {{ sales_today.receipts_count|default:"0" }}</small>
+    </div>
+
+    <div class="stat-card">
+        <div class="label">Виручка за поточний місяць</div>
+        <div class="value">{{ sales_month.total_sum|floatformat:2 }} ₴</div>
+        <small style="color: #575C55;">Чеків: {{ sales_month.receipts_count|default:"0" }}</small>
+    </div>
+
+    <div class="stat-card">
+        <div class="label">Загальна виручка (весь час)</div>
+        <div class="value">{{ sales_all_time.total_sum|floatformat:2 }} ₴</div>
+        <small style="color: #575C55;">Всього чеків: {{ sales_all_time.receipts_count|default:"0" }}</small>
+    </div>
+
+    <div class="stat-card">
+        <div class="label">Штат / Точки</div>
+        <div class="value">{{ employees_count }} / {{ stores.count }}</div>
+        <small style="color: #575C55;">Працівників / Магазинів і складів</small>
+    </div>
+</div>
+
+<div class="card">
+    <h3>📋 Останні продажі по мережі</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Чек №</th>
+                <th>Дата і час</th>
+                <th>Продавець</th>
+                <th>Клієнт</th>
+                <th>Оплата</th>
+                <th>Сума</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sale in recent_sales %}
+            <tr>
+                <td>#{{ sale.id }}</td>
+                <td>{{ sale.date|date:"d.m.Y" }} {{ sale.time|time:"H:i" }}</td>
+                <td>{{ sale.employee.full_name }}</td>
+                <td>{{ sale.customer.full_name|default:"Роздрібний покупець" }}</td>
+                <td>{{ sale.payment_method }}</td>
+                <td><strong>{{ sale.total }} ₴</strong></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6">Продажів ще не зафіксовано.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>⚠️ Товари з критичним залишком (менше 5 шт.)</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Штрихкод</th>
+                <th>Назва товару</th>
+                <th>Ціна продажу</th>
+                <th>Залишок</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in low_stock_products %}
+            <tr>
+                <td>{{ item.barcode }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.sale_price }} ₴</td>
+                <td><strong>{{ item.stock_quantity }} шт.</strong></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4">Критичних залишків немає.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

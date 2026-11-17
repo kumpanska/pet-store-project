@@ -8,9 +8,15 @@
 </head>
 <body>
 <div class="auth-wrapper">
-    <div class="auth-card" style="max-width: 480px;">
+    <div class="auth-card" style="max-width: 500px;">
         <h2>Реєстрація в системі</h2>
         <p class="subtitle">Створення облікового запису працівника</p>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
 
         <form method="POST">
             {% csrf_token %}
@@ -21,20 +27,31 @@
             <div class="form-row">
                 <div class="form-group">
                     <label>Посада</label>
-                    <input type="text" name="position" class="form-control" placeholder="Касир" required>
+                    <input type="text" name="position" class="form-control" placeholder="Продавець-консультант" required>
                 </div>
                 <div class="form-group">
                     <label>Телефон</label>
                     <input type="text" name="phone" class="form-control" placeholder="+380..." required>
                 </div>
             </div>
-            <div class="form-group">
-                <label>Роль у системі</label>
-                <select name="role_id" class="form-control" required>
-                    {% for role in roles %}
-                        <option value="{{ role.id }}">{{ role.name }}</option>
-                    {% endfor %}
-                </select>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Роль у системі</label>
+                    <select name="role_id" class="form-control" required>
+                        {% for role in roles %}
+                            <option value="{{ role.id }}">{{ role.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Торгова точка / Склад</label>
+                    <select name="store_id" class="form-control">
+                        <option value="">-- Вся мережа --</option>
+                        {% for st in stores %}
+                            <option value="{{ st.id }}">{{ st.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
             <div class="form-row">
                 <div class="form-group">

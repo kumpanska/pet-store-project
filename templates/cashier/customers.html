@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}База клієнтів{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Програма лояльності — Клієнти</h1>
+</div>
+
+<div class="card">
+    <h3>Зареєструвати нового клієнта</h3>
+    <form method="POST">
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-group">
+                <label>ПІБ клієнта</label>
+                <input type="text" name="full_name" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Телефон</label>
+                <input type="text" name="phone" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Email (необов'язково)</label>
+                <input type="email" name="email" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>Персональна знижка (%)</label>
+                <input type="number" step="0.01" min="0" max="100" name="discount_percent" class="form-control" value="5.00">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Додати клієнта</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>Зареєстровані покупці</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>ПІБ</th>
+                <th>Телефон</th>
+                <th>Email</th>
+                <th>Знижка</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in customers %}
+            <tr>
+                <td>{{ c.full_name }}</td>
+                <td>{{ c.phone }}</td>
+                <td>{{ c.email|default:"—" }}</td>
+                <td><strong>{{ c.discount_percent }}%</strong></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

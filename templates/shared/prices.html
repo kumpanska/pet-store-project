@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}Коригування цін{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Управління роздрібними цінами</h1>
+</div>
+
+<div class="card">
+    <h3>Встановити нову ціну на товар</h3>
+    <form method="POST">
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-group">
+                <label>Оберіть товар</label>
+                <select name="product_id" class="form-control" required>
+                    {% for p in products %}
+                        <option value="{{ p.id }}">{{ p.name }} (Поточна ціна: {{ p.sale_price }} ₴)</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="max-width: 220px;">
+                <label>Нова роздрібна ціна (₴)</label>
+                <input type="number" step="0.01" min="0" name="new_price" class="form-control" required>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Оновити ціну</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>Історія останніх змін цін</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Товар</th>
+                <th>Стара ціна</th>
+                <th>Нова ціна</th>
+                <th>Хто змінив</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for h in history %}
+            <tr>
+                <td>{{ h.change_date|date:"d.m.Y" }}</td>
+                <td>{{ h.product.name }}</td>
+                <td>{{ h.old_price }} ₴</td>
+                <td><strong>{{ h.new_price }} ₴</strong></td>
+                <td>{{ h.employee.full_name }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5">Змін цін ще не зафіксовано.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

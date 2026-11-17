@@ -15,6 +15,11 @@
             {% if account %}
                 <span>{{ account.employee.full_name }}</span>
                 <span>Роль: <strong>{{ account.role.name }}</strong></span>
+                {% if account.employee.store %}
+                    <span>Точка: <strong>{{ account.employee.store.name }}</strong></span>
+                {% else %}
+                    <span>Точка: <strong>Вся мережа</strong></span>
+                {% endif %}
             {% endif %}
         </div>
 
@@ -29,6 +34,8 @@
                 <li><a href="{% url 'create_sale' %}">🛒 Новий продаж (Чек)</a></li>
                 <li><a href="{% url 'process_return' %}">↩️ Повернення товару</a></li>
                 <li><a href="{% url 'manage_customers' %}">🐾 Клієнти та знижки</a></li>
+                <li><a href="{% url 'price_control' %}">🏷️ Коригування цін</a></li>
+            {% elif account.role.name == 'менеджер' %}
                 <li><a href="{% url 'price_control' %}">🏷️ Коригування цін</a></li>
             {% endif %}
         </ul>

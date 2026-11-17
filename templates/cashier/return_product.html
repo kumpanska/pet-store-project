@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Повернення товару{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Оформлення повернення від покупця</h1>
+</div>
+
+<div class="card">
+    <h3>Нове повернення</h3>
+    <form method="POST">
+        {% csrf_token %}
+        <div class="form-group">
+            <label>Оберіть позицію з останніх чеків</label>
+            <select name="sale_item_id" class="form-control" required>
+                {% for item in recent_items %}
+                    <option value="{{ item.id }}">
+                        Чек #{{ item.receipt.id }} ({{ item.receipt.date|date:"d.m.Y" }}) — {{ item.product.name }} | Куплено: {{ item.quantity }} шт. по {{ item.sale_price }} ₴
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Кількість до повернення</label>
+                <input type="number" name="quantity" class="form-control" min="1" value="1" required>
+            </div>
+            <div class="form-group">
+                <label>Причина повернення</label>
+                <input type="text" name="reason" class="form-control" placeholder="Не підійшов розмір / пошкодження тощо" required>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Оформити повернення на склад</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>📋 Історія повернень товарів</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Чек №</th>
+                <th>Товар</th>
+                <th>Кількість</th>
+                <th>Причина</th>
+                <th>Оформив продавець</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ret in returns_history %}
+            <tr>
+                <td>{{ ret.date|date:"d.m.Y" }}</td>
+                <td>#{{ ret.sale_item.receipt.id }}</td>
+                <td><strong>{{ ret.sale_item.product.name }}</strong></td>
+                <td>{{ ret.quantity }} шт.</td>
+                <td>{{ ret.reason|default:"—" }}</td>
+                <td>{{ ret.employee.full_name }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6">Повернень ще не зафіксовано.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
