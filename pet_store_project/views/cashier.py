@@ -302,7 +302,6 @@ def manage_customers(request):
         'customers': customers
     })
 
-
 @role_required(['продавець-консультант', 'менеджер'])
 def goods_receipt_create(request):
     if request.method == 'POST':
@@ -333,7 +332,13 @@ def goods_receipt_create(request):
                     qty = int(qty_str or 0)
                     if qty <= 0:
                         continue
-                    product = Product.objects.select_for_update().get(id=p_id)
+
+                    product = Product.objects.select_for_update().select_related('supplier').get(id=p_id)
+                    if product.supplier_id != supplier.id:
+                        raise ValueError(
+                            f'Товар "{product.name}" постачає "{product.supplier.company_name}", а не "{supplier.company_name}".'
+                        )
+
                     p_price = Decimal(price_str) if price_str else product.purchase_price
                     if p_price < 0:
                         raise ValueError('Закупівельна ціна не може бути від’ємною.')

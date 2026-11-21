@@ -13,7 +13,7 @@
         {% csrf_token %}
         <div class="form-group" style="max-width: 450px;">
             <label>Постачальник</label>
-            <select name="supplier_id" class="form-control" required>
+            <select name="supplier_id" id="supplier-select" class="form-control" onchange="filterProductsBySupplier()" required>
                 {% for s in suppliers %}
                     <option value="{{ s.id }}">{{ s.company_name }} ({{ s.contact_person }})</option>
                 {% endfor %}
@@ -25,10 +25,10 @@
             <div class="form-row receipt-row" style="margin-bottom: 10px; align-items: flex-end;">
                 <div class="form-group">
                     <label>Товар</label>
-                    <select name="product_id[]" class="form-control" onchange="fillPurchasePrice(this)" required>
+                    <select name="product_id[]" class="form-control product-select" onchange="fillPurchasePrice(this)" required>
                         <option value="">-- Оберіть товар --</option>
                         {% for p in products %}
-                            <option value="{{ p.id }}" data-price="{{ p.purchase_price }}">
+                            <option value="{{ p.id }}" data-supplier="{{ p.supplier_id }}" data-price="{{ p.purchase_price }}">
                                 {{ p.name }} [{{ p.barcode }}] (Зараз на складі: {{ p.stock_quantity }})
                             </option>
                         {% endfor %}
@@ -90,6 +90,28 @@
 </div>
 
 <script>
+    function filterProductsBySupplier() {
+        const selectedSupplierId = document.getElementById('supplier-select').value;
+
+        document.querySelectorAll('.product-select').forEach(selectEl => {
+            const currentOption = selectEl.options[selectEl.selectedIndex];
+            if (currentOption && currentOption.value && currentOption.dataset.supplier !== selectedSupplierId) {
+                selectEl.selectedIndex = 0;
+                const row = selectEl.closest('.receipt-row');
+                if (row && row.querySelector('.price-input')) {
+                    row.querySelector('.price-input').value = '';
+                }
+            }
+
+            Array.from(selectEl.options).forEach(opt => {
+                if (!opt.value) return;
+                const matches = opt.dataset.supplier === selectedSupplierId;
+                opt.hidden = !matches;
+                opt.disabled = !matches;
+            });
+        });
+    }
+
     function fillPurchasePrice(selectEl) {
         const price = selectEl.options[selectEl.selectedIndex]?.dataset.price || '';
         const row = selectEl.closest('.receipt-row');
@@ -104,6 +126,7 @@
         newRow.querySelector('input[type="number"]').value = 1;
         newRow.querySelector('.price-input').value = '';
         container.appendChild(newRow);
+        filterProductsBySupplier();
     }
 
     function removeReceiptRow(btn) {
@@ -112,5 +135,7 @@
             btn.closest('.receipt-row').remove();
         }
     }
+
+    document.addEventListener('DOMContentLoaded', filterProductsBySupplier);
 </script>
 {% endblock %}

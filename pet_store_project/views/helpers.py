@@ -101,11 +101,20 @@ def build_shift_report(shift):
         s for s in shift_sales
         if shift.open_time <= datetime.combine(s.date, s.time) <= end_dt
     ]
+    matched_sale_ids = [s.id for s in matched_sales]
+
     cash_sales = sum((s.total for s in matched_sales if s.payment_method == 'готівка'), Decimal('0.00'))
     card_sales = sum((s.total for s in matched_sales if s.payment_method != 'готівка'), Decimal('0.00'))
-    returns_sum = calculate_returns_sum(
-        ReturnProduct.objects.filter(employee=shift.employee, date__range=[shift.open_time.date(), end_dt.date()])
+
+    returns_qs = ReturnProduct.objects.filter(
+        employee=shift.employee,
+        date__range=[shift.open_time.date(), end_dt.date()]
     )
+    if shift.open_time.date() == end_dt.date():
+        returns_sum = calculate_returns_sum(returns_qs)
+    else:
+        returns_sum = calculate_returns_sum(returns_qs.filter(sale_item__receipt_id__in=matched_sale_ids))
+
     expected_cash = shift.cash_start + cash_sales - returns_sum
 
     return {
