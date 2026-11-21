@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block title %}{{ report_type }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ report_type }}</h1>
+</div>
+
+<div class="card" style="max-width: 650px;">
+    <h3>Касова зміна #{{ report.shift.id }}</h3>
+    <p style="color: #64748b; margin-bottom: 16px;">
+        Касир: <strong>{{ report.shift.employee.full_name }}</strong> |
+        Сформовано: {{ report.generated_at|date:"d.m.Y H:i:s" }}
+    </p>
+
+    <table>
+        <tbody>
+            <tr>
+                <td>Відкриття зміни</td>
+                <td><strong>{{ report.shift.open_time|date:"d.m.Y H:i" }}</strong></td>
+            </tr>
+            {% if report.shift.close_time %}
+            <tr>
+                <td>Закриття зміни</td>
+                <td><strong>{{ report.shift.close_time|date:"d.m.Y H:i" }}</strong></td>
+            </tr>
+            {% endif %}
+            <tr>
+                <td>Кількість проведених чеків</td>
+                <td><strong>{{ report.receipts_count }}</strong></td>
+            </tr>
+            <tr>
+                <td>Готівка на початок зміни</td>
+                <td>{{ report.shift.cash_start }} ₴</td>
+            </tr>
+            <tr>
+                <td>Виручка готівкою</td>
+                <td>{{ report.cash_sales }} ₴</td>
+            </tr>
+            <tr>
+                <td>Безготівкова виручка (картка / змішана)</td>
+                <td>{{ report.card_sales }} ₴</td>
+            </tr>
+            <tr>
+                <td>Сума повернень за зміну</td>
+                <td style="color: #dc2626;">-{{ report.returns_sum }} ₴</td>
+            </tr>
+            <tr>
+                <td><strong>Чиста виручка за зміну</strong></td>
+                <td><strong>{{ report.net_revenue }} ₴</strong></td>
+            </tr>
+            <tr>
+                <td>Очікуваний залишок готівки в касі</td>
+                <td><strong>{{ report.expected_cash }} ₴</strong></td>
+            </tr>
+            {% if report.shift.cash_end is not None %}
+            <tr>
+                <td>Фактична готівка при закритті</td>
+                <td><strong>{{ report.shift.cash_end }} ₴</strong></td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <div style="margin-top: 20px; display: flex; gap: 10px;">
+        <button type="button" class="btn btn-secondary" onclick="window.print()">🖨️ Роздрукувати звіт</button>
+        <a href="{% url 'cashier_dashboard' %}" class="btn btn-primary">← На робоче місце</a>
+    </div>
+</div>
+{% endblock %}

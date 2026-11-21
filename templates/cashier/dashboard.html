@@ -6,23 +6,49 @@
     <h1>Робоче місце продавця-консультанта</h1>
 </div>
 
+<div class="card" style="display: flex; gap: 10px; flex-wrap: wrap;">
+    <a href="{% url 'create_sale' %}" class="btn btn-primary">🛒 Новий чек</a>
+    <a href="{% url 'process_return' %}" class="btn btn-secondary">↩️ Повернення товару</a>
+    <a href="{% url 'manage_customers' %}" class="btn btn-secondary">👥 Програма лояльності</a>
+    <a href="{% url 'goods_receipt_create' %}" class="btn btn-secondary">📦 Прибуткові накладні</a>
+    <a href="{% url 'price_control' %}" class="btn btn-secondary">🏷️ Ціни та тижневі акції</a>
+    {% if active_shift %}
+        <a href="{% url 'shift_x_report' %}" class="btn btn-secondary">🧾 Сформувати X-звіт</a>
+    {% endif %}
+</div>
+
 <div class="card">
     <h3>Управління касовою зміною</h3>
     {% if active_shift %}
-        <p style="margin-bottom: 16px;">
+        <p style="margin-bottom: 12px;">
             🟢 <strong>Зміна відкрита:</strong> {{ active_shift.open_time|date:"d.m.Y H:i" }} |
             Початкова каса: <strong>{{ active_shift.cash_start }} ₴</strong> |
             Наторговано за зміну: <strong>{{ active_shift.total_sales }} ₴</strong>
         </p>
-        <form method="POST" action="{% url 'shift_manage' %}" style="max-width: 350px;">
+
+        {% if x_report %}
+        <div style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 16px; border: 1px solid #e2e8f0;">
+            <strong>Поточні показники зміни (X-звіт):</strong>
+            Чеків: <strong>{{ x_report.receipts_count }}</strong> |
+            Готівка: <strong>{{ x_report.cash_sales }} ₴</strong> |
+            Картка: <strong>{{ x_report.card_sales }} ₴</strong> |
+            Повернення: <strong>{{ x_report.returns_sum }} ₴</strong> |
+            Очікувана готівка в касі: <strong>{{ x_report.expected_cash }} ₴</strong>
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{% url 'shift_manage' %}" style="max-width: 420px;">
             {% csrf_token %}
             <input type="hidden" name="action" value="close">
             <div class="form-group">
                 <label>Залишок готівки в касі при закритті (₴)</label>
-                <input type="number" step="0.01" name="cash_end" class="form-control" required>
+                <input type="number" step="0.01" name="cash_end" class="form-control" value="{{ x_report.expected_cash|default:'0.00' }}" required>
             </div>
-            <button type="submit" class="btn btn-secondary">Закрити зміну</button>
-            <a href="{% url 'create_sale' %}" class="btn btn-primary">Перейти до каси →</a>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button type="submit" class="btn btn-secondary">Закрити зміну (Z-звіт)</button>
+                <a href="{% url 'shift_x_report' %}" class="btn btn-secondary">X-звіт</a>
+                <a href="{% url 'create_sale' %}" class="btn btn-primary">Перейти до каси →</a>
+            </div>
         </form>
     {% else %}
         <p style="margin-bottom: 16px;">🔴 Зміна наразі закрита. Відкрийте зміну, щоб почати оформлення чеків.</p>

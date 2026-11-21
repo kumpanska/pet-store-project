@@ -12,10 +12,12 @@
         <div class="form-row">
             <div class="form-group">
                 <label>Постійний клієнт (для застосування знижки)</label>
-                <select name="customer_id" class="form-control">
-                    <option value="">-- Без картки клієнта (0%) --</option>
+                <select name="customer_id" id="customer-select" class="form-control" onchange="recalculateTotal()">
+                    <option value="" data-discount="0">-- Без картки клієнта (0%) --</option>
                     {% for c in customers %}
-                        <option value="{{ c.id }}">{{ c.full_name }} ({{ c.phone }}) — Знижка {{ c.discount_percent }}%</option>
+                        <option value="{{ c.id }}" data-discount="{{ c.discount_percent }}">
+                            {{ c.full_name }} ({{ c.phone }}) — Знижка {{ c.discount_percent|floatformat:0 }}%
+                        </option>
                     {% endfor %}
                 </select>
             </div>
@@ -31,35 +33,80 @@
 
         <h3 style="margin-top: 16px;">Позиції в чеку</h3>
         <div id="items-container">
-            <div class="form-row item-row" style="margin-bottom: 10px;">
+            <div class="form-row item-row" style="margin-bottom: 10px; align-items: flex-end;">
                 <div class="form-group">
                     <label>Товар</label>
-                    <select name="product_id[]" class="form-control" required>
+                    <select name="product_id[]" class="form-control product-select" onchange="recalculateTotal()" required>
                         {% for p in products %}
-                            <option value="{{ p.id }}">{{ p.name }} — {{ p.sale_price }} ₴ (Залишок: {{ p.stock_quantity }})</option>
+                            <option value="{{ p.id }}" data-price="{{ p.sale_price }}" data-promo="{{ p.active_promo }}">
+                                {{ p.name }} — {{ p.sale_price }} ₴ (Залишок: {{ p.stock_quantity }}){% if p.active_promo > 0 %} [Акція -{{ p.active_promo|floatformat:0 }}%]{% endif %}
+                            </option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="form-group" style="max-width: 150px;">
                     <label>Кількість</label>
-                    <input type="number" name="quantity[]" class="form-control" value="1" min="1" required>
+                    <input type="number" name="quantity[]" class="form-control qty-input" value="1" min="1" oninput="recalculateTotal()" required>
+                </div>
+                <div class="form-group" style="max-width: 110px;">
+                    <button type="button" class="btn btn-secondary" onclick="removeRow(this)">Видалити</button>
                 </div>
             </div>
         </div>
 
-        <button type="button" class="btn btn-secondary" onclick="addRow()" style="margin-bottom: 20px;">+ Додати ще товар</button>
-        <br>
+        <button type="button" class="btn btn-secondary" onclick="addRow()" style="margin-bottom: 16px;">
+            + Додати ще товар
+        </button>
+
+        <div style="background: #f8f9fa; padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; border: 1px solid #e2e8f0;">
+            Орієнтовна сума до сплати: <strong id="receipt-total" style="font-size: 1.2em;">0.00 ₴</strong>
+            <span style="color: #64748b; font-size: 0.9em; margin-left: 8px;">(застосовується максимальна знижка: клієнта або тижнева акція)</span>
+        </div>
+
         <button type="submit" class="btn btn-primary">Провести чек та списати зі складу</button>
+        <a href="{% url 'cashier_dashboard' %}" class="btn btn-secondary">Скасувати</a>
     </form>
 </div>
 
 <script>
-function addRow() {
-    const container = document.getElementById('items-container');
-    const firstRow = container.querySelector('.item-row');
-    const newRow = firstRow.cloneNode(true);
-    newRow.querySelector('input').value = 1;
-    container.appendChild(newRow);
-}
+    function addRow() {
+        const container = document.getElementById('items-container');
+        const firstRow = container.querySelector('.item-row');
+        const newRow = firstRow.cloneNode(true);
+        newRow.querySelector('.qty-input').value = 1;
+        container.appendChild(newRow);
+        recalculateTotal();
+    }
+
+    function removeRow(btn) {
+        const container = document.getElementById('items-container');
+        if (container.querySelectorAll('.item-row').length > 1) {
+            btn.closest('.item-row').remove();
+            recalculateTotal();
+        }
+    }
+
+    function recalculateTotal() {
+        const customerSelect = document.getElementById('customer-select');
+        const customerDiscount = parseFloat(customerSelect.options[customerSelect.selectedIndex]?.dataset.discount || 0);
+        let total = 0;
+
+        document.querySelectorAll('.item-row').forEach(row => {
+            const prodSelect = row.querySelector('.product-select');
+            const option = prodSelect.options[prodSelect.selectedIndex];
+            const price = parseFloat(option?.dataset.price || 0);
+            const promo = parseFloat(option?.dataset.promo || 0);
+            const qty = parseInt(row.querySelector('.qty-input').value || 0);
+            const appliedDiscount = Math.max(customerDiscount, promo);
+
+            if (qty > 0) {
+                total += (price * qty) * (100 - appliedDiscount) / 100;
+            }
+        });
+
+        document.getElementById('receipt-total').textContent = total.toFixed(2) + ' ₴';
+    }
+
+    document.addEventListener('DOMContentLoaded', recalculateTotal);
 </script>
 {% endblock %}

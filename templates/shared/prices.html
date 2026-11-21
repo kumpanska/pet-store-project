@@ -1,26 +1,115 @@
 {% extends 'base.html' %}
-{% block title %}Коригування цін{% endblock %}
+{% block title %}Ціни та акційні знижки{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1>Управління роздрібними цінами</h1>
+    <h1>Керування цінами та акційними знижками</h1>
 </div>
 
 <div class="card">
-    <h3>Встановити нову ціну на товар</h3>
+    <h3>🏷️ Запустити тижневу акційну знижку (на категорію або товар)</h3>
     <form method="POST">
         {% csrf_token %}
+        <input type="hidden" name="action" value="add_promo">
         <div class="form-row">
             <div class="form-group">
-                <label>Оберіть товар</label>
+                <label>Назва акції</label>
+                <input type="text" name="promo_title" class="form-control" placeholder="Наприклад: Тиждень корму" required>
+            </div>
+            <div class="form-group">
+                <label>На що діє акція</label>
+                <select name="target_type" id="promo-target-type" class="form-control" onchange="togglePromoTargets()">
+                    <option value="category">На всю категорію товарів</option>
+                    <option value="product">На конкретний товар</option>
+                </select>
+            </div>
+            <div class="form-group" id="category-target-box">
+                <label>Категорія</label>
+                <select name="target_id" id="category-select" class="form-control">
+                    {% for cat in categories %}
+                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" id="product-target-box" style="display: none;">
+                <label>Товар</label>
+                <select id="product-promo-select" class="form-control" disabled>
+                    {% for p in products %}
+                        <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group" style="max-width: 200px;">
+                <label>Знижка (%)</label>
+                <input type="number" step="0.01" min="1" max="90" name="promo_percent" class="form-control" value="10" required>
+            </div>
+            <div class="form-group" style="max-width: 220px;">
+                <label>Тривалість (днів)</label>
+                <select name="duration_days" class="form-control">
+                    <option value="7" selected>7 днів (1 тиждень)</option>
+                    <option value="14">14 днів (2 тижні)</option>
+                    <option value="3">3 дні (вихідні)</option>
+                    <option value="30">30 днів (місяць)</option>
+                </select>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Активувати акцію</button>
+    </form>
+
+    {% if active_promos %}
+    <h4 style="margin-top: 20px;">Активні акції зараз</h4>
+    <table>
+        <thead>
+            <tr>
+                <th>Акція</th>
+                <th>Об'єкт</th>
+                <th>Знижка</th>
+                <th>Період дії</th>
+                <th>Хто запустив</th>
+                <th>Дія</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for promo in active_promos %}
+            <tr>
+                <td><strong>{{ promo.title }}</strong></td>
+                <td>{{ promo.target_name }}</td>
+                <td><strong>-{{ promo.percent|floatformat:0 }}%</strong></td>
+                <td>{{ promo.start_date|date:"d.m.Y" }} — {{ promo.end_date|date:"d.m.Y" }}</td>
+                <td>{{ promo.created_by }}</td>
+                <td>
+                    <form method="POST" style="display: inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="remove_promo">
+                        <input type="hidden" name="promo_key" value="{{ promo.key }}">
+                        <button type="submit" class="btn btn-secondary">Скасувати</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h3>💰 Змінити роздрібну ціну товару</h3>
+    <form method="POST">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="change_price">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Товар</label>
                 <select name="product_id" class="form-control" required>
                     {% for p in products %}
-                        <option value="{{ p.id }}">{{ p.name }} (Поточна ціна: {{ p.sale_price }} ₴)</option>
+                        <option value="{{ p.id }}">{{ p.name }} ({{ p.category.name }}) — Поточна ціна: {{ p.sale_price }} ₴</option>
                     {% endfor %}
                 </select>
             </div>
             <div class="form-group" style="max-width: 220px;">
-                <label>Нова роздрібна ціна (₴)</label>
+                <label>Нова ціна (₴)</label>
                 <input type="number" step="0.01" min="0" name="new_price" class="form-control" required>
             </div>
         </div>
@@ -29,7 +118,7 @@
 </div>
 
 <div class="card">
-    <h3>Історія останніх змін цін</h3>
+    <h3>📋 Історія змін цін</h3>
     <table>
         <thead>
             <tr>
@@ -44,15 +133,41 @@
             {% for h in history %}
             <tr>
                 <td>{{ h.change_date|date:"d.m.Y" }}</td>
-                <td>{{ h.product.name }}</td>
+                <td><strong>{{ h.product.name }}</strong></td>
                 <td>{{ h.old_price }} ₴</td>
                 <td><strong>{{ h.new_price }} ₴</strong></td>
                 <td>{{ h.employee.full_name }}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="5">Змін цін ще не зафіксовано.</td></tr>
+            <tr><td colspan="5">Історія змін цін порожня.</td></tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+<script>
+    function togglePromoTargets() {
+        const type = document.getElementById('promo-target-type').value;
+        const catBox = document.getElementById('category-target-box');
+        const prodBox = document.getElementById('product-target-box');
+        const catSelect = document.getElementById('category-select');
+        const prodSelect = document.getElementById('product-promo-select');
+
+        if (type === 'category') {
+            catBox.style.display = 'block';
+            prodBox.style.display = 'none';
+            catSelect.name = 'target_id';
+            catSelect.disabled = false;
+            prodSelect.removeAttribute('name');
+            prodSelect.disabled = true;
+        } else {
+            catBox.style.display = 'none';
+            prodBox.style.display = 'block';
+            prodSelect.name = 'target_id';
+            prodSelect.disabled = false;
+            catSelect.removeAttribute('name');
+            catSelect.disabled = true;
+        }
+    }
+</script>
 {% endblock %}
