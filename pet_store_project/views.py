@@ -13,6 +13,9 @@ from .models import (
 from .permissions import role_required
 
 
+ALLOWED_DISCOUNTS = {Decimal('3.00'), Decimal('5.00'), Decimal('10.00')}
+
+
 def calculate_returns_sum(queryset):
     expr = ExpressionWrapper(
         F('sale_item__sale_price') * F('quantity') * (Decimal('100') - F('sale_item__discount')) / Decimal('100'),
@@ -20,6 +23,61 @@ def calculate_returns_sum(queryset):
     )
     total = queryset.aggregate(total_ret=Sum(expr))['total_ret'] or Decimal('0.00')
     return round(total, 2)
+
+
+def get_customer_net_spent(customer):
+    if not customer:
+        return Decimal('0.00')
+
+    total_sales = Sale.objects.filter(customer=customer).aggregate(
+        total=Sum('total')
+    )['total'] or Decimal('0.00')
+
+    total_returns = calculate_returns_sum(
+        ReturnProduct.objects.filter(sale_item__receipt__customer=customer)
+    )
+
+    return max(Decimal('0.00'), total_sales - total_returns)
+
+
+def get_customer_discount(customer, strict_by_spent=False):
+    if not customer:
+        return Decimal('0.00')
+
+    net_spent = get_customer_net_spent(customer)
+
+    if net_spent >= Decimal('15000.00'):
+        calculated_discount = Decimal('10.00')
+    elif net_spent >= Decimal('5000.00'):
+        calculated_discount = Decimal('5.00')
+    else:
+        calculated_discount = Decimal('3.00')
+
+    if not strict_by_spent and customer.discount_percent in ALLOWED_DISCOUNTS:
+        return max(customer.discount_percent, calculated_discount)
+
+    return calculated_discount
+
+
+def sync_all_customers_and_sales():
+    customers = list(Customer.objects.all().order_by('-id'))
+    for customer in customers:
+        customer.net_spent = get_customer_net_spent(customer)
+        actual_discount = get_customer_discount(customer)
+        if customer.discount_percent != actual_discount:
+            customer.discount_percent = actual_discount
+            customer.save(update_fields=['discount_percent'])
+
+    # Оновлюємо знижки у позиціях чеків під актуальний рівень клієнта
+    for item in SaleItem.objects.select_related('receipt__customer').filter(receipt__customer__isnull=False):
+        target_discount = item.receipt.customer.discount_percent
+        if item.discount != target_discount:
+            item.discount = target_discount
+            item.save(update_fields=['discount'])
+
+    return customers
+
+
 def register_view(request):
     director_exists = UserAccount.objects.filter(role__name='директор', is_active=True).exists()
     roles = RoleInStore.objects.exclude(name='директор') if director_exists else RoleInStore.objects.all()
@@ -31,12 +89,20 @@ def register_view(request):
         phone = request.POST.get('phone')
         role_id = request.POST.get('role_id')
         store_id = request.POST.get('store_id') or None
-        login_str = request.POST.get('login')
-        password_str = request.POST.get('password')
+        login_str = (request.POST.get('login') or '').strip()
+        password_str = request.POST.get('password') or ''
 
         selected_role = RoleInStore.objects.filter(id=role_id).first()
         if not selected_role or (director_exists and selected_role.name == 'директор'):
             messages.error(request, 'Обрана роль недоступна для реєстрації.')
+            return redirect('register')
+
+        if not login_str:
+            messages.error(request, 'Логін не може бути порожнім.')
+            return redirect('register')
+
+        if len(password_str) < 6:
+            messages.error(request, 'Пароль має містити щонайменше 6 символів.')
             return redirect('register')
 
         if UserAccount.objects.filter(login=login_str).exists():
@@ -91,6 +157,7 @@ def login_view(request):
 def logout_view(request):
     request.session.flush()
     return redirect('login')
+
 
 @role_required(['директор'])
 def director_dashboard(request):
@@ -152,8 +219,8 @@ def director_employees(request):
         full_name = request.POST.get('full_name')
         position = request.POST.get('position')
         phone = request.POST.get('phone')
-        login_str = request.POST.get('login')
-        password_str = request.POST.get('password')
+        login_str = (request.POST.get('login') or '').strip()
+        password_str = request.POST.get('password') or ''
         role_id = request.POST.get('role_id')
         store_id = request.POST.get('store_id') or None
 
@@ -162,9 +229,18 @@ def director_employees(request):
             messages.error(request, 'Неможливо створити ще одного директора. Оберіть іншу роль.')
             return redirect('director_employees')
 
-        if login_str and UserAccount.objects.filter(login=login_str).exists():
-            messages.error(request, f'Логін "{login_str}" уже зайнятий.')
-            return redirect('director_employees')
+        if login_str or password_str:
+            if not login_str:
+                messages.error(request, 'Вкажіть логін для створення облікового запису.')
+                return redirect('director_employees')
+
+            if len(password_str) < 6:
+                messages.error(request, 'Пароль має містити щонайменше 6 символів.')
+                return redirect('director_employees')
+
+            if UserAccount.objects.filter(login=login_str).exists():
+                messages.error(request, f'Логін "{login_str}" уже зайнятий.')
+                return redirect('director_employees')
 
         try:
             with transaction.atomic():
@@ -236,6 +312,7 @@ def director_salaries_view(request):
         'total_payroll': total_payroll
     })
 
+
 @role_required(['продавець-консультант'])
 def cashier_dashboard(request):
     employee = request.user_account.employee
@@ -297,7 +374,7 @@ def create_sale(request):
         quantities = request.POST.getlist('quantity[]')
 
         customer = Customer.objects.filter(id=customer_id).first() if customer_id else None
-        discount_pct = customer.discount_percent if customer else Decimal('0')
+        discount_pct = get_customer_discount(customer)
 
         try:
             with transaction.atomic():
@@ -347,6 +424,12 @@ def create_sale(request):
 
                 active_shift.total_sales += sale.total
                 active_shift.save()
+
+                if customer:
+                    new_discount = get_customer_discount(customer)
+                    if customer.discount_percent != new_discount:
+                        customer.discount_percent = new_discount
+                        customer.save(update_fields=['discount_percent'])
 
             messages.success(request, f'Чек №{sale.id} успішно проведено на суму {sale.total} грн.')
             return redirect('cashier_dashboard')
@@ -406,15 +489,20 @@ def process_return(request):
                 quantity=qty,
                 reason=reason
             )
-            # 1. Повертаємо товар на склад
             product = sale_item.product
             product.stock_quantity += qty
             product.save()
 
-            # 2. Мінусуємо суму повернення з виручки поточної відкритої зміни касира
             if active_shift:
                 active_shift.total_sales = max(Decimal('0.00'), active_shift.total_sales - refund_amount)
                 active_shift.save()
+
+            customer = sale_item.receipt.customer
+            if customer:
+                new_discount = get_customer_discount(customer, strict_by_spent=True)
+                if customer.discount_percent != new_discount:
+                    customer.discount_percent = new_discount
+                    customer.save(update_fields=['discount_percent'])
 
         messages.success(
             request,
@@ -426,7 +514,7 @@ def process_return(request):
     returns_history = (
         ReturnProduct.objects
         .select_related('sale_item__receipt', 'sale_item__product', 'employee')
-        .order_by('-date', '-id')
+        .order_by('-date', '-id')[:20]
     )
 
     return render(request, 'cashier/return_product.html', {
@@ -444,11 +532,11 @@ def manage_customers(request):
         email = request.POST.get('email') or None
 
         try:
-            discount = Decimal(request.POST.get('discount_percent', '0'))
-            if discount < 0 or discount > 100:
+            discount = Decimal(request.POST.get('discount_percent', '3.00'))
+            if discount not in ALLOWED_DISCOUNTS:
                 raise ValueError
         except (InvalidOperation, ValueError):
-            messages.error(request, 'Знижка має бути числом від 0 до 100%.')
+            messages.error(request, 'Оберіть коректну знижку зі списку: 3%, 5% або 10%.')
             return redirect('manage_customers')
 
         try:
@@ -458,17 +546,18 @@ def manage_customers(request):
                 email=email,
                 discount_percent=discount
             )
-            messages.success(request, f'Клієнта {full_name} додано до бази.')
+            messages.success(request, f'Клієнта {full_name} додано до бази зі знижкою {discount:.0f}%.')
         except IntegrityError:
             messages.error(request, 'Клієнт із таким телефоном або email уже зареєстрований.')
 
         return redirect('manage_customers')
 
-    customers = Customer.objects.all().order_by('-id')
+    customers = sync_all_customers_and_sales()
     return render(request, 'cashier/customers.html', {
         'account': request.user_account,
         'customers': customers
     })
+
 
 @role_required(['продавець-консультант', 'менеджер'])
 def price_control(request):

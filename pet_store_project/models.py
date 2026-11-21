@@ -1,5 +1,4 @@
 from django.db import models
-from django.contrib.auth.models import User
 
 
 class ProductCategory(models.Model):
@@ -41,6 +40,7 @@ class Customer(models.Model):
     def __str__(self):
         return f"{self.full_name} ({self.phone})"
 
+
 class Store(models.Model):
     name = models.CharField(max_length=100)
     address = models.CharField(max_length=255, blank=True, null=True)
@@ -52,6 +52,7 @@ class Store(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.type})"
+
 
 class Employee(models.Model):
     full_name = models.CharField(max_length=150)
@@ -65,6 +66,7 @@ class Employee(models.Model):
 
     def __str__(self):
         return self.full_name
+
 
 class RoleInStore(models.Model):
     name = models.CharField(max_length=50, unique=True)
@@ -177,9 +179,108 @@ class Salary(models.Model):
     period_month = models.DateField()
     base_amount = models.DecimalField(max_digits=10, decimal_places=2)
     bonus = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    # Поле total генерується базою даних (STORED), тому в Django позначаємо його як readonly або ігноруємо при записі
     total = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
     class Meta:
         managed = False
         db_table = 'salary'
+
+
+class GoodsReceipt(models.Model):
+    date = models.DateField()
+    total = models.DecimalField(max_digits=12, decimal_places=2)
+    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, db_column='supplier_id')
+
+    class Meta:
+        managed = False
+        db_table = 'goods_receipt'
+
+
+class GoodsReceiptItem(models.Model):
+    goods_receipt = models.ForeignKey(GoodsReceipt, on_delete=models.CASCADE, related_name='items', db_column='goods_receipt_id')
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, db_column='product_id')
+    quantity = models.IntegerField()
+    purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
+    total = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'goods_receipt_item'
+
+
+class InventoryCheck(models.Model):
+    date = models.DateField()
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, db_column='product_id')
+    expected_quantity = models.IntegerField()
+    actual_quantity = models.IntegerField()
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, db_column='employee_id')
+
+    class Meta:
+        managed = False
+        db_table = 'inventory_check'
+
+
+class StockTransfer(models.Model):
+    date = models.DateField()
+    from_store = models.ForeignKey(Store, on_delete=models.PROTECT, related_name='transfers_out', db_column='from_store_id')
+    to_store = models.ForeignKey(Store, on_delete=models.PROTECT, related_name='transfers_in', db_column='to_store_id')
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, db_column='product_id')
+    quantity = models.IntegerField()
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, db_column='employee_id')
+
+    class Meta:
+        managed = False
+        db_table = 'stock_transfer'
+
+
+class WriteOffAct(models.Model):
+    date = models.DateField()
+    reason = models.CharField(max_length=255)
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, db_column='employee_id')
+
+    class Meta:
+        managed = False
+        db_table = 'write_off_act'
+
+
+class WriteOffItem(models.Model):
+    write_off_act = models.ForeignKey(WriteOffAct, on_delete=models.CASCADE, related_name='items', db_column='write_off_act_id')
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, db_column='product_id')
+    quantity = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = 'write_off_item'
+
+
+class SupplierOrder(models.Model):
+    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, db_column='supplier_id')
+    date = models.DateField()
+    status = models.CharField(max_length=20)
+    total = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'supplier_order'
+
+
+class SupplierOrderItem(models.Model):
+    supplier_order = models.ForeignKey(SupplierOrder, on_delete=models.CASCADE, related_name='items', db_column='supplier_order_id')
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, db_column='product_id')
+    quantity = models.IntegerField()
+    price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'supplier_order_item'
+
+
+class SupplierPayment(models.Model):
+    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, db_column='supplier_id')
+    goods_receipt = models.ForeignKey(GoodsReceipt, on_delete=models.PROTECT, db_column='goods_receipt_id')
+    date = models.DateField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+
+    class Meta:
+        managed = False
+        db_table = 'supplier_payment'
