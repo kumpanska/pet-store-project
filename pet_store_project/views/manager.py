@@ -5,8 +5,9 @@ from django.db import transaction, IntegrityError
 from django.db.models.deletion import ProtectedError
 from django.contrib import messages
 
+
 from ..models import (
-    Product, ProductCategory, Supplier, Store, GoodsReceipt,
+    Product, ProductCategory, Supplier, Store, GoodsReceipt, GoodsReceiptItem,
     InventoryCheck, StockTransfer, WriteOffAct, WriteOffItem,
     SupplierOrder, SupplierOrderItem
 )
@@ -351,9 +352,27 @@ def manager_suppliers(request):
 
         if action == 'update_order_status':
             order = get_object_or_404(SupplierOrder, id=request.POST.get('order_id'))
-            order.status = request.POST.get('status')
+            new_status = request.POST.get('status')
+            order.status = new_status
             order.save(update_fields=['status'])
-            messages.success(request, f'Статус замовлення №{order.id} змінено на "{order.status}".')
+
+            if new_status == 'виконано':
+                has_receipt = GoodsReceipt.objects.filter(
+                    supplier=order.supplier,
+                    date__gte=order.date
+                ).exists()
+                if has_receipt:
+                    messages.success(
+                        request,
+                        f'Замовлення №{order.id} позначено як виконане. Прибуткова накладна від постачальника вже заведена касиром.'
+                    )
+                else:
+                    messages.warning(
+                        request,
+                        f'Замовлення №{order.id} позначено як виконане. Нагадайте продавцю-консультанту оформити прибуткову накладну для оприбуткування товару на склад!'
+                    )
+            else:
+                messages.success(request, f'Статус замовлення №{order.id} змінено на "{new_status}".')
             return redirect('manager_suppliers')
 
     return render(request, 'manager/suppliers.html', {

@@ -13,14 +13,13 @@
         <div class="form-row">
             <div class="form-group">
                 <label>Прибуткова накладна</label>
-                <select name="goods_receipt_id" id="receipt-select" class="form-control" onchange="syncMaxPaymentAmount()" required>
-                    <option value="">-- Оберіть неоплачену накладну --</option>
+               <select name="goods_receipt_id" id="receipt-select" class="form-control" onchange="syncMaxPaymentAmount()" required>
+                    <option value="">-- Оберіть перевірену накладну до сплати --</option>
                     {% for r in receipts %}
-                        {% if r.balance_due > 0 %}
+                        {% if r.balance_due > 0 and r.is_verified %}
                             <option value="{{ r.id }}" data-balance="{{ r.balance_due|stringformat:'s' }}">
                                 Накладна #{{ r.id }} ({{ r.date|date:"d.m.Y" }}) — {{ r.supplier.company_name }}
-                                [{% if r.is_verified %}✅ Перевірено{% else %}⏳ Не перевірено{% endif %}]
-                                — До сплати: {{ r.balance_due }} ₴
+                                [✅ Перевірено] — До сплати: {{ r.balance_due }} ₴
                             </option>
                         {% endif %}
                     {% endfor %}

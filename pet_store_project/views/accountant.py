@@ -36,8 +36,15 @@ def accountant_dashboard(request):
 def accountant_supplier_payments(request):
     if request.method == 'POST':
         receipt = get_object_or_404(GoodsReceipt, id=request.POST.get('goods_receipt_id'))
-        payment_method = request.POST.get('payment_method', 'безготівковий')
+        payment_method = request.POST.get('payment_method', 'картка')
         note = (request.POST.get('note') or '').strip()
+
+        if not receipt.is_verified:
+            messages.error(
+                request,
+                f'Накладна №{receipt.id} ще не перевірена менеджером! Оплата дозволена лише після підтвердження менеджером.'
+            )
+            return redirect('accountant_supplier_payments')
 
         try:
             amount = Decimal(request.POST.get('amount', '0'))
