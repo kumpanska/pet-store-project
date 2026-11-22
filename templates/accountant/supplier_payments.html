@@ -17,30 +17,44 @@
                     {% for r in receipts %}
                         {% if r.balance_due > 0 %}
                             <option value="{{ r.id }}">
-                                Накладна #{{ r.id }} від {{ r.date|date:"d.m.Y" }} — {{ r.supplier.company_name }} (Сума: {{ r.total }} ₴ | Залишок боргу: {{ r.balance_due }} ₴)
+                                Накладна #{{ r.id }} ({{ r.date|date:"d.m.Y" }}) — {{ r.supplier.company_name }}
+                                [{% if r.is_verified %}✅ Перевірено{% else %}⏳ Не перевірено{% endif %}]
+                                — До сплати: {{ r.balance_due }} ₴
                             </option>
                         {% endif %}
                     {% endfor %}
                 </select>
             </div>
-            <div class="form-group" style="max-width: 240px;">
+            <div class="form-group" style="max-width: 220px;">
+                <label>Спосіб оплати</label>
+                <select name="payment_method" class="form-control" required>
+                    <option value="безготівковий">Безготівковий (рахунок)</option>
+                    <option value="картка">Банківська картка</option>
+                    <option value="готівка">Готівка (з каси)</option>
+                </select>
+            </div>
+            <div class="form-group" style="max-width: 180px;">
                 <label>Сума оплати (₴)</label>
                 <input type="number" step="0.01" min="0.01" name="amount" class="form-control" required>
             </div>
+        </div>
+        <div class="form-group" style="max-width: 600px;">
+            <label>Примітка бухгалтера (необов'язково)</label>
+            <input type="text" name="note" class="form-control" placeholder="Номер платіжного доручення або коментар">
         </div>
         <button type="submit" class="btn btn-primary">Зареєструвати оплату</button>
     </form>
 </div>
 
 <div class="card">
-    <h3>Стан розрахунків по накладних</h3>
+    <h3>Стан розрахунків та перевірка накладних менеджером</h3>
     <table>
         <thead>
             <tr>
-                <th>Накладна №</th>
-                <th>Дата</th>
+                <th>Накладна / Дата</th>
                 <th>Постачальник</th>
-                <th>Загальна сума</th>
+                <th>Перевірка та примітка менеджера</th>
+                <th>Сума / Претензія</th>
                 <th>Сплачено</th>
                 <th>Залишок боргу</th>
             </tr>
@@ -48,10 +62,24 @@
         <tbody>
             {% for r in receipts %}
             <tr>
-                <td>#{{ r.id }}</td>
-                <td>{{ r.date|date:"d.m.Y" }}</td>
+                <td><strong>#{{ r.id }}</strong><br><small>{{ r.date|date:"d.m.Y" }}</small></td>
                 <td><strong>{{ r.supplier.company_name }}</strong></td>
-                <td>{{ r.total }} ₴</td>
+                <td>
+                    {% if r.is_verified %}
+                        <span style="color: #16a34a; font-weight: 600;">✅ Перевірено</span>
+                    {% else %}
+                        <span style="color: #d97706; font-weight: 600;">⏳ Очікує перевірки</span>
+                    {% endif %}
+                    {% if r.manager_note %}
+                        <div style="font-size: 0.88em; color: #334155; margin-top: 3px;">📝 {{ r.manager_note }}</div>
+                    {% endif %}
+                </td>
+                <td>
+                    {{ r.total }} ₴
+                    {% if r.discrepancy_amount > 0 %}
+                        <div style="color: #dc2626; font-size: 0.85em;">Претензія: -{{ r.discrepancy_amount }} ₴</div>
+                    {% endif %}
+                </td>
                 <td>{{ r.paid_amount }} ₴</td>
                 <td>
                     {% if r.balance_due > 0 %}
@@ -73,9 +101,11 @@
     <table>
         <thead>
             <tr>
-                <th>Дата платежу</th>
+                <th>Дата</th>
                 <th>Постачальник</th>
                 <th>Накладна</th>
+                <th>Спосіб оплати</th>
+                <th>Примітка</th>
                 <th>Сума</th>
             </tr>
         </thead>
@@ -85,10 +115,12 @@
                 <td>{{ p.date|date:"d.m.Y" }}</td>
                 <td>{{ p.supplier.company_name }}</td>
                 <td>#{{ p.goods_receipt.id }}</td>
+                <td><strong>{{ p.payment_method }}</strong></td>
+                <td>{{ p.note|default:"—" }}</td>
                 <td><strong>{{ p.amount }} ₴</strong></td>
             </tr>
             {% empty %}
-            <tr><td colspan="4">Платежів ще не проведено.</td></tr>
+            <tr><td colspan="6">Платежів ще не проведено.</td></tr>
             {% endfor %}
         </tbody>
     </table>

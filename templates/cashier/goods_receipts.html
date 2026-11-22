@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="page-header">
-    <h1>Прибуткові накладні (Оприбуткування товару)</h1>
+    <h1>Прибуткові накладні (Оприбуткування та перевірка)</h1>
 </div>
 
 {% if account.role.name|lower == 'продавець-консультант' %}
@@ -11,6 +11,7 @@
     <h3>Оформити нову прибуткову накладну</h3>
     <form method="POST">
         {% csrf_token %}
+        <input type="hidden" name="action" value="create_receipt">
         <div class="form-group" style="max-width: 450px;">
             <label>Постачальник</label>
             <select name="supplier_id" id="supplier-select" class="form-control" onchange="filterProductsBySupplier()" required>
@@ -58,29 +59,82 @@
 {% endif %}
 
 <div class="card">
-    <h3>📋 Історія прибуткових накладних</h3>
+    <h3>📋 Реєстр прибуткових накладних</h3>
     <table>
         <thead>
             <tr>
-                <th>Накладна №</th>
-                <th>Дата</th>
+                <th>Накладна / Дата</th>
                 <th>Постачальник</th>
-                <th>Товари</th>
-                <th>Загальна сума</th>
+                <th>Склад позицій</th>
+                <th>Сума та оплата</th>
+                <th>Перевірка менеджером та примітки</th>
             </tr>
         </thead>
         <tbody>
             {% for r in receipts %}
             <tr>
-                <td>#{{ r.id }}</td>
-                <td>{{ r.date|date:"d.m.Y" }}</td>
+                <td>
+                    <strong>#{{ r.id }}</strong><br>
+                    <small>{{ r.date|date:"d.m.Y" }}</small>
+                </td>
                 <td>{{ r.supplier.company_name }}</td>
                 <td>
                     {% for item in r.items.all %}
                         <div>{{ item.product.name }} — {{ item.quantity }} шт. × {{ item.purchase_price }} ₴</div>
                     {% endfor %}
                 </td>
-                <td><strong>{{ r.total }} ₴</strong></td>
+                <td>
+                    <strong>{{ r.total }} ₴</strong>
+                    {% if r.discrepancy_amount > 0 %}
+                        <div style="color: #dc2626; font-size: 0.85em;">Нестача/претензія: -{{ r.discrepancy_amount }} ₴</div>
+                    {% endif %}
+                    <div style="margin-top: 6px; font-size: 0.85em;">
+                        {% for pay in r.supplierpayment_set.all %}
+                            <div style="color: #16a34a;">
+                                💳 Сплачено {{ pay.amount }} ₴ (<strong>{{ pay.payment_method }}</strong>, {{ pay.date|date:"d.m.Y" }})
+                            </div>
+                        {% empty %}
+                            <span style="color: #64748b;">Не оплачено</span>
+                        {% endfor %}
+                    </div>
+                </td>
+                <td>
+                    {% if r.is_verified %}
+                        <div style="color: #16a34a; font-weight: 600;">✅ Перевірено ({{ r.verified_by.full_name|default:"Менеджер" }})</div>
+                    {% else %}
+                        <div style="color: #d97706; font-weight: 600;">⏳ Очікує перевірки</div>
+                    {% endif %}
+
+                    {% if r.manager_note %}
+                        <div style="background: #f8f9fa; padding: 6px 8px; border-radius: 4px; margin-top: 4px; font-size: 0.9em;">
+                            📝 {{ r.manager_note }}
+                        </div>
+                    {% endif %}
+
+                    {% if account.role.name|lower == 'менеджер' %}
+                    <form method="POST" style="margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 8px;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="verify_receipt">
+                        <input type="hidden" name="receipt_id" value="{{ r.id }}">
+                        <div style="margin-bottom: 6px;">
+                            <label style="font-size: 0.85em; cursor: pointer;">
+                                <input type="checkbox" name="is_verified" {% if r.is_verified %}checked{% endif %}>
+                                Накладну перевірено
+                            </label>
+                        </div>
+                        <div style="margin-bottom: 6px;">
+                            <input type="text" name="manager_note" class="form-control" style="padding: 4px 8px; font-size: 0.85em;"
+                                   placeholder="Примітка (все добре / чого не вистачає)" value="{{ r.manager_note|default:'' }}">
+                        </div>
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                            <input type="number" step="0.01" min="0" max="{{ r.total }}" name="discrepancy_amount"
+                                   class="form-control" style="padding: 4px 8px; font-size: 0.85em; width: 120px;"
+                                   placeholder="Нестача (₴)" value="{{ r.discrepancy_amount }}">
+                            <button type="submit" class="btn btn-primary" style="padding: 4px 10px; font-size: 0.85em;">Зберегти</button>
+                        </div>
+                    </form>
+                    {% endif %}
+                </td>
             </tr>
             {% empty %}
             <tr><td colspan="5">Прибуткових накладних ще не оформлено.</td></tr>
@@ -91,7 +145,9 @@
 
 <script>
     function filterProductsBySupplier() {
-        const selectedSupplierId = document.getElementById('supplier-select').value;
+        const supplierSelect = document.getElementById('supplier-select');
+        if (!supplierSelect) return;
+        const selectedSupplierId = supplierSelect.value;
 
         document.querySelectorAll('.product-select').forEach(selectEl => {
             const currentOption = selectEl.options[selectEl.selectedIndex];

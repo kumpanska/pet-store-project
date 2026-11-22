@@ -69,33 +69,104 @@
                 <label>Початковий залишок (шт.)</label>
                 <input type="number" min="0" name="stock_quantity" class="form-control" value="0" required>
             </div>
+            <div class="form-group">
+                <label>Придатний до (необов'язково)</label>
+                <input type="date" name="expiration_date" class="form-control">
+            </div>
         </div>
         <button type="submit" class="btn btn-primary">Додати товар у каталог</button>
     </form>
 </div>
 
 <div class="card">
-    <h3>Усі товари в каталозі</h3>
+    <h3>Усі товари в каталозі (редагування та видалення)</h3>
     <table>
         <thead>
             <tr>
-                <th>Штрихкод</th>
-                <th>Назва</th>
-                <th>Категорія</th>
-                <th>Постачальник</th>
-                <th>Закупівля / Продаж</th>
+                <th>Товар / Штрихкод</th>
+                <th>Категорія та постачальник</th>
+                <th>Ціни (Закуп. / Прод.)</th>
+                <th>Придатний до</th>
                 <th>Залишок</th>
+                <th>Дії</th>
             </tr>
         </thead>
         <tbody>
             {% for p in products %}
             <tr>
-                <td>{{ p.barcode }}</td>
-                <td><strong>{{ p.name }}</strong></td>
-                <td>{{ p.category.name }}</td>
-                <td>{{ p.supplier.company_name }}</td>
+                <td>
+                    <strong>{{ p.name }}</strong><br>
+                    <small style="color: #64748b;">{{ p.barcode }}</small>
+                </td>
+                <td>
+                    {{ p.category.name }}<br>
+                    <small style="color: #64748b;">{{ p.supplier.company_name }}</small>
+                </td>
                 <td>{{ p.purchase_price }} ₴ / <strong>{{ p.sale_price }} ₴</strong></td>
+                <td>{{ p.expiration_date|date:"d.m.Y"|default:"—" }}</td>
                 <td><strong>{{ p.stock_quantity }} шт.</strong></td>
+                <td>
+                    <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.85em;"
+                            onclick="toggleEditRow('edit-row-{{ p.id }}')">✏️ Редагувати</button>
+                    <form method="POST" style="display: inline;" onsubmit="return confirm('Видалити товар {{ p.name }}?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete_product">
+                        <input type="hidden" name="product_id" value="{{ p.id }}">
+                        <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.85em; color: #dc2626;">🗑️</button>
+                    </form>
+                </td>
+            </tr>
+            <tr id="edit-row-{{ p.id }}" style="display: none; background: #f8f9fa;">
+                <td colspan="6">
+                    <form method="POST">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="edit_product">
+                        <input type="hidden" name="product_id" value="{{ p.id }}">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Назва</label>
+                                <input type="text" name="name" class="form-control" value="{{ p.name }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Штрихкод</label>
+                                <input type="text" name="barcode" class="form-control" value="{{ p.barcode }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Категорія</label>
+                                <select name="category_id" class="form-control">
+                                    {% for c in categories %}
+                                        <option value="{{ c.id }}" {% if c.id == p.category_id %}selected{% endif %}>{{ c.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Постачальник</label>
+                                <select name="supplier_id" class="form-control">
+                                    {% for s in suppliers %}
+                                        <option value="{{ s.id }}" {% if s.id == p.supplier_id %}selected{% endif %}>{{ s.company_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row" style="align-items: flex-end;">
+                            <div class="form-group">
+                                <label>Закупівельна ціна (₴)</label>
+                                <input type="number" step="0.01" name="purchase_price" class="form-control" value="{{ p.purchase_price }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Роздрібна ціна (₴)</label>
+                                <input type="number" step="0.01" name="sale_price" class="form-control" value="{{ p.sale_price }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Придатний до</label>
+                                <input type="date" name="expiration_date" class="form-control" value="{{ p.expiration_date|date:'Y-m-d' }}">
+                            </div>
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-primary">Зберегти зміни</button>
+                            </div>
+                        </div>
+                    </form>
+                </td>
             </tr>
             {% empty %}
             <tr><td colspan="6">Товарів у каталозі ще немає.</td></tr>
@@ -103,4 +174,11 @@
         </tbody>
     </table>
 </div>
+
+<script>
+    function toggleEditRow(rowId) {
+        const row = document.getElementById(rowId);
+        row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+    }
+</script>
 {% endblock %}

@@ -12,8 +12,9 @@
         <div class="value">{{ total_products }}</div>
     </div>
     <div class="stat-card">
-        <div class="label">Постачальників</div>
-        <div class="value">{{ total_suppliers }}</div>
+        <div class="label">Неперевірені накладні</div>
+        <div class="value">{{ unverified_receipts_count }}</div>
+        <small><a href="{% url 'goods_receipt_create' %}">Перейти до перевірки →</a></small>
     </div>
     <div class="stat-card">
         <div class="label">Критичний залишок (&lt; 5 шт.)</div>
@@ -25,6 +26,46 @@
     </div>
 </div>
 
+{% if expired_products or expiring_soon_products %}
+<div class="card">
+    <h3>⏳ Контроль термінів придатності</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Статус</th>
+                <th>Товар</th>
+                <th>Категорія</th>
+                <th>Залишок</th>
+                <th>Придатний до</th>
+                <th>Рекомендована дія</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in expired_products %}
+            <tr>
+                <td><strong style="color: #dc2626;">🔴 Прострочено</strong></td>
+                <td><strong>{{ p.name }}</strong></td>
+                <td>{{ p.category.name }}</td>
+                <td>{{ p.stock_quantity }} шт.</td>
+                <td><strong>{{ p.expiration_date|date:"d.m.Y" }}</strong></td>
+                <td><a href="{% url 'manager_write_offs' %}" class="btn btn-secondary" style="padding: 4px 10px;">Оформити списання</a></td>
+            </tr>
+            {% endfor %}
+            {% for p in expiring_soon_products %}
+            <tr>
+                <td><strong style="color: #d97706;">🟡 Спливає до 14 днів</strong></td>
+                <td><strong>{{ p.name }}</strong></td>
+                <td>{{ p.category.name }}</td>
+                <td>{{ p.stock_quantity }} шт.</td>
+                <td><strong>{{ p.expiration_date|date:"d.m.Y" }}</strong></td>
+                <td><a href="{% url 'price_control' %}" class="btn btn-secondary" style="padding: 4px 10px;">Запустити акцію</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
 <div class="card">
     <h3>⚠️ Товари, що закінчуються (менше 5 шт.)</h3>
     <table>
@@ -32,9 +73,9 @@
             <tr>
                 <th>Штрихкод</th>
                 <th>Товар</th>
-                <th>Категорія</th>
                 <th>Постачальник</th>
                 <th>Залишок</th>
+                <th>Автозамовлення</th>
             </tr>
         </thead>
         <tbody>
@@ -42,40 +83,21 @@
             <tr>
                 <td>{{ p.barcode }}</td>
                 <td><strong>{{ p.name }}</strong></td>
-                <td>{{ p.category.name }}</td>
                 <td>{{ p.supplier.company_name }}</td>
                 <td><strong>{{ p.stock_quantity }} шт.</strong></td>
+                <td>
+                    <form method="POST" style="display: inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="auto_order_low_stock">
+                        <input type="hidden" name="supplier_id" value="{{ p.supplier.id }}">
+                        <button type="submit" class="btn btn-primary" style="padding: 4px 10px; font-size: 0.85em;">
+                            Замовити у {{ p.supplier.company_name }}
+                        </button>
+                    </form>
+                </td>
             </tr>
             {% empty %}
             <tr><td colspan="5">Усі товари в достатній кількості.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<div class="card">
-    <h3>🚚 Останні переміщення товарів</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>Дата</th>
-                <th>Товар</th>
-                <th>Звідки</th>
-                <th>Куди</th>
-                <th>Кількість</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for t in recent_transfers %}
-            <tr>
-                <td>{{ t.date|date:"d.m.Y" }}</td>
-                <td><strong>{{ t.product.name }}</strong></td>
-                <td>{{ t.from_store.name }}</td>
-                <td>{{ t.to_store.name }}</td>
-                <td>{{ t.quantity }} шт.</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="5">Переміщень ще не було.</td></tr>
             {% endfor %}
         </tbody>
     </table>

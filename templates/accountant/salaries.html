@@ -12,16 +12,18 @@
         {% csrf_token %}
         <div class="form-row">
             <div class="form-group">
-                <label>Співробітник</label>
+                <label>Співробітник (показники за поточний місяць)</label>
                 <select name="employee_id" class="form-control" required>
                     {% for emp in employees %}
-                        <option value="{{ emp.id }}">{{ emp.full_name }} ({{ emp.position }})</option>
+                        <option value="{{ emp.id }}">
+                            {{ emp.full_name }} ({{ emp.position }}) — Змін: {{ emp.month_shifts_count }}, Продажі: {{ emp.month_sales_sum|floatformat:2 }} ₴
+                        </option>
                     {% endfor %}
                 </select>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="max-width: 240px;">
                 <label>Місяць нарахування</label>
-                <input type="month" name="period_month" class="form-control" required>
+                <input type="month" name="period_month" class="form-control" value="{{ current_month }}" required>
             </div>
         </div>
         <div class="form-row">
