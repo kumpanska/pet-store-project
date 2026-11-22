@@ -103,8 +103,8 @@ def build_shift_report(shift):
     matched_sale_ids = [s.id for s in matched_sales]
 
     cash_sales = sum((s.total for s in matched_sales if s.payment_method == 'готівка'), Decimal('0.00'))
-    card_sales = sum((s.total for s in matched_sales if s.payment_method != 'готівка'), Decimal('0.00'))
-
+    card_sales = sum((s.total for s in matched_sales if s.payment_method == 'картка'), Decimal('0.00'))
+    mixed_sales = sum((s.total for s in matched_sales if s.payment_method == 'змішана'), Decimal('0.00'))
     returns_qs = ReturnProduct.objects.filter(
         employee=shift.employee,
         date__range=[shift.open_time.date(), end_dt.date()]
@@ -127,9 +127,10 @@ def build_shift_report(shift):
         'receipts_count': len(matched_sales),
         'cash_sales': cash_sales,
         'card_sales': card_sales,
+        'mixed_sales': mixed_sales,
         'returns_sum': returns_sum,
         'cash_supplier_payouts': cash_supplier_payouts,
-        'net_revenue': cash_sales + card_sales - returns_sum,
+        'net_revenue': cash_sales + card_sales + mixed_sales - returns_sum,
         'expected_cash': max(Decimal('0.00'), expected_cash),
         'generated_at': datetime.now(),
     }

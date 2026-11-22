@@ -85,12 +85,15 @@ def accountant_supplier_payments(request):
     })
 
 
+ALLOWED_BONUS_PERCENTS = {Decimal('0'), Decimal('2'), Decimal('3'), Decimal('5')}
+
+
 @role_required(['бухгалтер'])
 def accountant_salaries(request):
     today = date.today()
 
     if request.method == 'POST':
-        emp = get_object_or_404(Employee, id=request.POST.get('employee_id'))
+        emp = get_object_or_404(Employee.objects.select_related('useraccount__role'), id=request.POST.get('employee_id'))
         period_str = request.POST.get('period_month')
         try:
             if len(period_str) == 7:
@@ -102,11 +105,17 @@ def accountant_salaries(request):
             auto_bonus_pct = Decimal(request.POST.get('sales_bonus_percent', '0'))
             manual_bonus = Decimal(request.POST.get('manual_bonus', '0'))
 
-            if base_amount < 0 or auto_bonus_pct < 0 or manual_bonus < 0:
+            if base_amount < 0 or manual_bonus < 0:
+                raise ValueError
+            if auto_bonus_pct not in ALLOWED_BONUS_PERCENTS:
                 raise ValueError
         except (InvalidOperation, ValueError, TypeError):
-            messages.error(request, 'Перевірте коректність введених сум та періоду.')
+            messages.error(request, 'Перевірте коректність введених сум, відсотка премії та періоду.')
             return redirect('accountant_salaries')
+
+        role_name = emp.useraccount.role.name.lower() if hasattr(emp, 'useraccount') else ''
+        if role_name != 'продавець-консультант':
+            auto_bonus_pct = Decimal('0')
 
         emp_sales = Sale.objects.filter(
             employee=emp,
@@ -129,8 +138,9 @@ def accountant_salaries(request):
         )
         return redirect('accountant_salaries')
 
-    employees = list(Employee.objects.select_related('store').all())
+    employees = list(Employee.objects.select_related('store', 'useraccount__role').all())
     for emp in employees:
+        emp.role_name = emp.useraccount.role.name.lower() if hasattr(emp, 'useraccount') else ''
         emp.month_shifts_count = WorkShift.objects.filter(
             employee=emp, open_time__year=today.year, open_time__month=today.month
         ).count()
@@ -145,7 +155,6 @@ def accountant_salaries(request):
         'salaries': salaries,
         'current_month': today.strftime('%Y-%m'),
     })
-
 
 @role_required(['бухгалтер'])
 def accountant_pnl_report(request):
