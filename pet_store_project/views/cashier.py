@@ -302,10 +302,42 @@ def manage_customers(request):
         'customers': customers
     })
 
+
 @role_required(['продавець-консультант', 'менеджер'])
 def goods_receipt_create(request):
+    role_name = request.user_account.role.name.lower()
+
     if request.method == 'POST':
-        if request.user_account.role.name.lower() != 'продавець-консультант':
+        action = request.POST.get('action', 'create_receipt')
+
+        # Перевірка накладної менеджером + примітка про нестачу + сума претензії
+        if action == 'verify_receipt':
+            if role_name != 'менеджер':
+                messages.error(request, 'Підтверджувати перевірку накладних може лише менеджер.')
+                return redirect('goods_receipt_create')
+
+            receipt = get_object_or_404(GoodsReceipt, id=request.POST.get('receipt_id'))
+            is_verified = request.POST.get('is_verified') == 'on'
+            manager_note = (request.POST.get('manager_note') or '').strip()
+            try:
+                discrepancy = Decimal(request.POST.get('discrepancy_amount') or '0.00')
+                if discrepancy < 0 or discrepancy > receipt.total:
+                    raise ValueError
+            except (InvalidOperation, ValueError):
+                messages.error(request, 'Сума розбіжностей має бути від 0 до повної суми накладної.')
+                return redirect('goods_receipt_create')
+
+            receipt.is_verified = is_verified
+            receipt.manager_note = manager_note or 'Перевірено менеджером, розбіжностей немає.'
+            receipt.discrepancy_amount = discrepancy
+            receipt.verified_by = request.user_account.employee
+            receipt.save(update_fields=['is_verified', 'manager_note', 'discrepancy_amount', 'verified_by'])
+
+            messages.success(request, f'Статус і примітку для накладної №{receipt.id} збережено.')
+            return redirect('goods_receipt_create')
+
+        # Створення нової накладної продавцем-консультантом
+        if role_name != 'продавець-консультант':
             messages.error(request, 'Оформлення прибуткових накладних доступне лише продавцю-консультанту.')
             return redirect('goods_receipt_create')
 
@@ -321,7 +353,9 @@ def goods_receipt_create(request):
                 receipt = GoodsReceipt.objects.create(
                     date=date.today(),
                     total=Decimal('0.00'),
-                    supplier=supplier
+                    supplier=supplier,
+                    is_verified=False,
+                    discrepancy_amount=Decimal('0.00')
                 )
                 total_invoice = Decimal('0.00')
                 items_count = 0
@@ -365,14 +399,19 @@ def goods_receipt_create(request):
 
             messages.success(
                 request,
-                f'Прибуткова накладна №{receipt.id} від "{supplier.company_name}" на суму {receipt.total} грн проведена.'
+                f'Прибуткова накладна №{receipt.id} від "{supplier.company_name}" на суму {receipt.total} грн проведена та передана на перевірку менеджеру.'
             )
             return redirect('goods_receipt_create')
 
         except (InvalidOperation, ValueError) as e:
             messages.error(request, str(e))
 
-    receipts = GoodsReceipt.objects.select_related('supplier').prefetch_related('items__product').order_by('-date', '-id')[:20]
+    receipts = (
+        GoodsReceipt.objects
+        .select_related('supplier', 'verified_by')
+        .prefetch_related('items__product', 'supplierpayment_set')
+        .order_by('-date', '-id')[:30]
+    )
     return render(request, 'cashier/goods_receipts.html', {
         'account': request.user_account,
         'suppliers': Supplier.objects.all(),

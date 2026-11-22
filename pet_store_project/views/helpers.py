@@ -2,10 +2,9 @@ from datetime import date, datetime
 from decimal import Decimal
 from django.db.models import Sum, F, ExpressionWrapper, DecimalField
 
-from ..models import Customer, Sale, SaleItem, ReturnProduct
+from ..models import Customer, Sale, SaleItem, ReturnProduct, SupplierPayment
 
 ALLOWED_DISCOUNTS = {Decimal('3.00'), Decimal('5.00'), Decimal('10.00')}
-
 ACTIVE_PROMO_DISCOUNTS = {}
 
 
@@ -115,7 +114,13 @@ def build_shift_report(shift):
     else:
         returns_sum = calculate_returns_sum(returns_qs.filter(sale_item__receipt_id__in=matched_sale_ids))
 
-    expected_cash = shift.cash_start + cash_sales - returns_sum
+    # Готівкові виплати постачальникам із каси за день зміни
+    cash_supplier_payouts = SupplierPayment.objects.filter(
+        payment_method='готівка',
+        date__range=[shift.open_time.date(), end_dt.date()]
+    ).aggregate(s=Sum('amount'))['s'] or Decimal('0.00')
+
+    expected_cash = shift.cash_start + cash_sales - returns_sum - cash_supplier_payouts
 
     return {
         'shift': shift,
@@ -123,6 +128,7 @@ def build_shift_report(shift):
         'cash_sales': cash_sales,
         'card_sales': card_sales,
         'returns_sum': returns_sum,
+        'cash_supplier_payouts': cash_supplier_payouts,
         'net_revenue': cash_sales + card_sales - returns_sum,
         'expected_cash': max(Decimal('0.00'), expected_cash),
         'generated_at': datetime.now(),

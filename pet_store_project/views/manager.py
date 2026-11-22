@@ -1,7 +1,8 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db import transaction, IntegrityError
+from django.db.models.deletion import ProtectedError
 from django.contrib import messages
 
 from ..models import (
@@ -14,17 +15,64 @@ from ..permissions import role_required
 
 @role_required(['менеджер'])
 def manager_dashboard(request):
+    today = date.today()
+    two_weeks_later = today + timedelta(days=14)
+
+    if request.method == 'POST' and request.POST.get('action') == 'auto_order_low_stock':
+        supplier_id = request.POST.get('supplier_id')
+        supplier = get_object_or_404(Supplier, id=supplier_id)
+        deficit_products = Product.objects.filter(supplier=supplier, stock_quantity__lt=5)
+
+        if not deficit_products.exists():
+            messages.info(request, f'У постачальника "{supplier.company_name}" немає товарів із критичним залишком.')
+            return redirect('manager_dashboard')
+
+        with transaction.atomic():
+            order = SupplierOrder.objects.create(
+                supplier=supplier,
+                date=today,
+                status='створено',
+                total=Decimal('0.00')
+            )
+            order_total = Decimal('0.00')
+            for p in deficit_products:
+                order_qty = max(10 - p.stock_quantity, 5)
+                SupplierOrderItem.objects.create(
+                    supplier_order=order,
+                    product=p,
+                    quantity=order_qty,
+                    price=p.purchase_price
+                )
+                order_total += p.purchase_price * order_qty
+
+            order.total = round(order_total, 2)
+            order.save(update_fields=['total'])
+
+        messages.success(
+            request,
+            f'Автоматично сформовано замовлення №{order.id} для "{supplier.company_name}" на суму {order.total} грн.'
+        )
+        return redirect('manager_suppliers')
+
     low_stock = Product.objects.select_related('category', 'supplier').filter(stock_quantity__lt=5)
+    expired_products = Product.objects.select_related('category').filter(
+        expiration_date__lt=today, stock_quantity__gt=0
+    )
+    expiring_soon_products = Product.objects.select_related('category').filter(
+        expiration_date__range=[today, two_weeks_later], stock_quantity__gt=0
+    )
+    unverified_receipts_count = GoodsReceipt.objects.filter(is_verified=False).count()
     pending_orders = SupplierOrder.objects.select_related('supplier').exclude(status='виконано').order_by('-date')
     recent_transfers = StockTransfer.objects.select_related('from_store', 'to_store', 'product').order_by('-date', '-id')[:5]
-    recent_write_offs = WriteOffAct.objects.select_related('employee').order_by('-date', '-id')[:5]
 
     return render(request, 'manager/dashboard.html', {
         'account': request.user_account,
         'low_stock': low_stock,
+        'expired_products': expired_products,
+        'expiring_soon_products': expiring_soon_products,
+        'unverified_receipts_count': unverified_receipts_count,
         'pending_orders': pending_orders,
         'recent_transfers': recent_transfers,
-        'recent_write_offs': recent_write_offs,
         'total_products': Product.objects.count(),
         'total_suppliers': Supplier.objects.count(),
     })
@@ -46,6 +94,7 @@ def manager_catalog(request):
             return redirect('manager_catalog')
 
         if action == 'create_product':
+            exp_date = request.POST.get('expiration_date') or None
             try:
                 Product.objects.create(
                     name=request.POST.get('name'),
@@ -53,6 +102,7 @@ def manager_catalog(request):
                     sale_price=Decimal(request.POST.get('sale_price')),
                     purchase_price=Decimal(request.POST.get('purchase_price')),
                     stock_quantity=int(request.POST.get('stock_quantity', 0)),
+                    expiration_date=exp_date,
                     category_id=request.POST.get('category_id'),
                     supplier_id=request.POST.get('supplier_id'),
                 )
@@ -63,11 +113,13 @@ def manager_catalog(request):
 
         if action == 'edit_product':
             product = get_object_or_404(Product, id=request.POST.get('product_id'))
+            exp_date = request.POST.get('expiration_date') or None
             try:
                 product.name = request.POST.get('name')
                 product.barcode = request.POST.get('barcode')
                 product.purchase_price = Decimal(request.POST.get('purchase_price'))
                 product.sale_price = Decimal(request.POST.get('sale_price'))
+                product.expiration_date = exp_date
                 product.category_id = request.POST.get('category_id')
                 product.supplier_id = request.POST.get('supplier_id')
                 product.save()
@@ -76,11 +128,25 @@ def manager_catalog(request):
                 messages.error(request, 'Помилка оновлення картки товару.')
             return redirect('manager_catalog')
 
+        if action == 'delete_product':
+            product = get_object_or_404(Product, id=request.POST.get('product_id'))
+            try:
+                name = product.name
+                product.delete()
+                messages.success(request, f'Товар "{name}" видалено з каталогу.')
+            except ProtectedError:
+                messages.error(
+                    request,
+                    f'Неможливо видалити "{product.name}", оскільки цей товар уже фігурує в історії продажів, накладних або списань.'
+                )
+            return redirect('manager_catalog')
+
     return render(request, 'manager/catalog.html', {
         'account': request.user_account,
         'products': Product.objects.select_related('category', 'supplier').all().order_by('name'),
         'categories': ProductCategory.objects.all(),
         'suppliers': Supplier.objects.all(),
+        'today': date.today(),
     })
 
 

@@ -6,7 +6,7 @@ from django.contrib import messages
 
 from ..models import (
     Employee, Sale, SaleItem, ReturnProduct, Salary,
-    GoodsReceipt, SupplierPayment, WriteOffItem
+    GoodsReceipt, SupplierPayment, WriteOffItem, WorkShift
 )
 from ..permissions import role_required
 from .helpers import calculate_returns_sum
@@ -17,9 +17,11 @@ def accountant_dashboard(request):
     today = date.today()
     month_sales = Sale.objects.filter(date__year=today.year, date__month=today.month).aggregate(s=Sum('total'))['s'] or Decimal('0.00')
     month_returns = calculate_returns_sum(ReturnProduct.objects.filter(date__year=today.year, date__month=today.month))
-    total_receipts = GoodsReceipt.objects.aggregate(s=Sum('total'))['s'] or Decimal('0.00')
+
+    receipts = GoodsReceipt.objects.all()
+    total_payable = sum((max(Decimal('0.00'), r.total - r.discrepancy_amount) for r in receipts), Decimal('0.00'))
     total_paid = SupplierPayment.objects.aggregate(s=Sum('amount'))['s'] or Decimal('0.00')
-    debt_to_suppliers = max(Decimal('0.00'), total_receipts - total_paid)
+    debt_to_suppliers = max(Decimal('0.00'), total_payable - total_paid)
 
     return render(request, 'accountant/dashboard.html', {
         'account': request.user_account,
@@ -34,6 +36,9 @@ def accountant_dashboard(request):
 def accountant_supplier_payments(request):
     if request.method == 'POST':
         receipt = get_object_or_404(GoodsReceipt, id=request.POST.get('goods_receipt_id'))
+        payment_method = request.POST.get('payment_method', 'безготівковий')
+        note = (request.POST.get('note') or '').strip()
+
         try:
             amount = Decimal(request.POST.get('amount', '0'))
             if amount <= 0:
@@ -43,26 +48,34 @@ def accountant_supplier_payments(request):
             return redirect('accountant_supplier_payments')
 
         paid_already = SupplierPayment.objects.filter(goods_receipt=receipt).aggregate(s=Sum('amount'))['s'] or Decimal('0.00')
-        remaining = receipt.total - paid_already
+        net_invoice_total = max(Decimal('0.00'), receipt.total - receipt.discrepancy_amount)
+        remaining = net_invoice_total - paid_already
 
         if amount > remaining:
-            messages.error(request, f'Сума оплати перевищує залишок боргу за накладною ({remaining} грн).')
+            messages.error(request, f'Сума оплати перевищує залишок боргу з урахуванням акту розбіжностей ({remaining} грн).')
             return redirect('accountant_supplier_payments')
 
         SupplierPayment.objects.create(
             supplier=receipt.supplier,
             goods_receipt=receipt,
             date=date.today(),
-            amount=amount
+            amount=amount,
+            payment_method=payment_method,
+            note=note or None
         )
-        messages.success(request, f'Оплату {amount} грн по накладній №{receipt.id} ({receipt.supplier.company_name}) проведено.')
+        messages.success(
+            request,
+            f'Оплату {amount} грн ({payment_method}) по накладній №{receipt.id} ({receipt.supplier.company_name}) проведено.'
+        )
         return redirect('accountant_supplier_payments')
 
-    receipts = list(GoodsReceipt.objects.select_related('supplier').order_by('-date', '-id'))
+    receipts = list(GoodsReceipt.objects.select_related('supplier', 'verified_by').order_by('-date', '-id'))
     for r in receipts:
         paid = SupplierPayment.objects.filter(goods_receipt=r).aggregate(s=Sum('amount'))['s'] or Decimal('0.00')
+        net_total = max(Decimal('0.00'), r.total - r.discrepancy_amount)
         r.paid_amount = paid
-        r.balance_due = max(Decimal('0.00'), r.total - paid)
+        r.net_total = net_total
+        r.balance_due = max(Decimal('0.00'), net_total - paid)
 
     payments = SupplierPayment.objects.select_related('supplier', 'goods_receipt').order_by('-date', '-id')[:30]
     return render(request, 'accountant/supplier_payments.html', {
@@ -74,6 +87,8 @@ def accountant_supplier_payments(request):
 
 @role_required(['бухгалтер'])
 def accountant_salaries(request):
+    today = date.today()
+
     if request.method == 'POST':
         emp = get_object_or_404(Employee, id=request.POST.get('employee_id'))
         period_str = request.POST.get('period_month')
@@ -114,11 +129,21 @@ def accountant_salaries(request):
         )
         return redirect('accountant_salaries')
 
+    employees = list(Employee.objects.select_related('store').all())
+    for emp in employees:
+        emp.month_shifts_count = WorkShift.objects.filter(
+            employee=emp, open_time__year=today.year, open_time__month=today.month
+        ).count()
+        emp.month_sales_sum = Sale.objects.filter(
+            employee=emp, date__year=today.year, date__month=today.month
+        ).aggregate(s=Sum('total'))['s'] or Decimal('0.00')
+
     salaries = Salary.objects.select_related('employee__store').order_by('-period_month', 'employee__full_name')
     return render(request, 'accountant/salaries.html', {
         'account': request.user_account,
-        'employees': Employee.objects.select_related('store').all(),
+        'employees': employees,
         'salaries': salaries,
+        'current_month': today.strftime('%Y-%m'),
     })
 
 

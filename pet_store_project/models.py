@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import F, ExpressionWrapper, DecimalField
 
+
 class ProductCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, null=True)
@@ -44,7 +45,7 @@ class Customer(models.Model):
 class Store(models.Model):
     name = models.CharField(max_length=100)
     address = models.CharField(max_length=255, blank=True, null=True)
-    type = models.CharField(max_length=20)  # 'магазин', 'склад'
+    type = models.CharField(max_length=20)
 
     class Meta:
         managed = False
@@ -101,6 +102,7 @@ class Product(models.Model):
     sale_price = models.DecimalField(max_digits=10, decimal_places=2)
     purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
     stock_quantity = models.IntegerField(default=0)
+    expiration_date = models.DateField(blank=True, null=True)
     category = models.ForeignKey(ProductCategory, on_delete=models.PROTECT, db_column='category_id')
     supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, db_column='supplier_id')
 
@@ -192,10 +194,15 @@ class Salary(models.Model):
         managed = False
         db_table = 'salary'
 
+
 class GoodsReceipt(models.Model):
     date = models.DateField()
     total = models.DecimalField(max_digits=12, decimal_places=2)
     supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, db_column='supplier_id')
+    is_verified = models.BooleanField(default=False)
+    manager_note = models.TextField(blank=True, null=True)
+    discrepancy_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    verified_by = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True, db_column='verified_by_id')
 
     class Meta:
         managed = False
@@ -293,6 +300,8 @@ class SupplierPayment(models.Model):
     goods_receipt = models.ForeignKey(GoodsReceipt, on_delete=models.PROTECT, db_column='goods_receipt_id')
     date = models.DateField()
     amount = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_method = models.CharField(max_length=30, default='безготівковий')
+    note = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
         managed = False
