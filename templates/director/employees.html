@@ -10,6 +10,7 @@
     <h3>Додати нового співробітника</h3>
     <form method="POST">
         {% csrf_token %}
+        <input type="hidden" name="action" value="create">
         <div class="form-row">
             <div class="form-group">
                 <label>ПІБ</label>
@@ -30,7 +31,7 @@
                 <input type="text" name="login" class="form-control" required>
             </div>
             <div class="form-group">
-                <label>Пароль</label>
+                <label>Пароль (мін. 6 символів)</label>
                 <input type="password" name="password" class="form-control" required>
             </div>
             <div class="form-group">
@@ -56,27 +57,69 @@
 </div>
 
 <div class="card">
-    <h3>Список активних акаунтів</h3>
+    <h3>Облікові записи та керування доступами</h3>
     <table>
         <thead>
             <tr>
-                <th>ПІБ</th>
-                <th>Посада</th>
-                <th>Точка</th>
-                <th>Телефон</th>
+                <th>ПІБ / Посада</th>
                 <th>Логін</th>
-                <th>Роль</th>
+                <th>Статус</th>
+                <th>Роль та точка</th>
+                <th>Блокування</th>
             </tr>
         </thead>
         <tbody>
             {% for acc in accounts %}
             <tr>
-                <td>{{ acc.employee.full_name }}</td>
-                <td>{{ acc.employee.position }}</td>
-                <td>{{ acc.employee.store.name|default:"Вся мережа" }}</td>
-                <td>{{ acc.employee.phone }}</td>
+                <td>
+                    <strong>{{ acc.employee.full_name }}</strong><br>
+                    <small style="color: #575C55;">{{ acc.employee.position }} | {{ acc.employee.phone }}</small>
+                </td>
                 <td>{{ acc.login }}</td>
-                <td><strong>{{ acc.role.name }}</strong></td>
+                <td>
+                    {% if acc.is_active %}
+                        <span style="color: #16a34a; font-weight: 600;">🟢 Активний</span>
+                    {% else %}
+                        <span style="color: #dc2626; font-weight: 600;">🔴 Заблокований</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if acc.role.name == 'директор' %}
+                        <strong>{{ acc.role.name }}</strong> (Вся мережа)
+                    {% else %}
+                        <form method="POST" style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="update_role_store">
+                            <input type="hidden" name="employee_id" value="{{ acc.employee.id }}">
+                            <select name="role_id" class="form-control" style="padding: 4px 8px; width: auto;">
+                                {% for r in roles %}
+                                    <option value="{{ r.id }}" {% if r.id == acc.role_id %}selected{% endif %}>{{ r.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <select name="store_id" class="form-control" style="padding: 4px 8px; width: auto;">
+                                <option value="">Вся мережа</option>
+                                {% for st in stores %}
+                                    <option value="{{ st.id }}" {% if st.id == acc.employee.store_id %}selected{% endif %}>{{ st.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-secondary" style="padding: 4px 10px;">Оновити</button>
+                        </form>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if acc.role.name != 'директор' %}
+                        <form method="POST">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="toggle_access">
+                            <input type="hidden" name="account_id" value="{{ acc.id }}">
+                            <button type="submit" class="btn btn-secondary" style="padding: 4px 10px;">
+                                {% if acc.is_active %}Заблокувати{% else %}Активувати{% endif %}
+                            </button>
+                        </form>
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>

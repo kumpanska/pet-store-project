@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% block title %}Панель менеджера{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Робоче місце менеджера</h1>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="label">Позицій у каталозі</div>
+        <div class="value">{{ total_products }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Постачальників</div>
+        <div class="value">{{ total_suppliers }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Критичний залишок (&lt; 5 шт.)</div>
+        <div class="value">{{ low_stock.count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Активні замовлення</div>
+        <div class="value">{{ pending_orders.count }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>⚠️ Товари, що закінчуються (менше 5 шт.)</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Штрихкод</th>
+                <th>Товар</th>
+                <th>Категорія</th>
+                <th>Постачальник</th>
+                <th>Залишок</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in low_stock %}
+            <tr>
+                <td>{{ p.barcode }}</td>
+                <td><strong>{{ p.name }}</strong></td>
+                <td>{{ p.category.name }}</td>
+                <td>{{ p.supplier.company_name }}</td>
+                <td><strong>{{ p.stock_quantity }} шт.</strong></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5">Усі товари в достатній кількості.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>🚚 Останні переміщення товарів</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Товар</th>
+                <th>Звідки</th>
+                <th>Куди</th>
+                <th>Кількість</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in recent_transfers %}
+            <tr>
+                <td>{{ t.date|date:"d.m.Y" }}</td>
+                <td><strong>{{ t.product.name }}</strong></td>
+                <td>{{ t.from_store.name }}</td>
+                <td>{{ t.to_store.name }}</td>
+                <td>{{ t.quantity }} шт.</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5">Переміщень ще не було.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

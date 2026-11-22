@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}Інвентаризація{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Проведення інвентаризації</h1>
+</div>
+
+<div class="card">
+    <h3>Звірка фактичних залишків на складі</h3>
+    <form method="POST">
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-group">
+                <label>Товар</label>
+                <select name="product_id" class="form-control" required>
+                    {% for p in products %}
+                        <option value="{{ p.id }}">{{ p.name }} [{{ p.barcode }}] — За обліком: {{ p.stock_quantity }} шт.</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="max-width: 240px;">
+                <label>Фактична кількість (шт.)</label>
+                <input type="number" min="0" name="actual_quantity" class="form-control" required>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Зафіксувати інвентаризацію та оновити залишок</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>📋 Історія інвентаризацій</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Товар</th>
+                <th>За обліком</th>
+                <th>Фактично</th>
+                <th>Хто провів</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in checks %}
+            <tr>
+                <td>{{ c.date|date:"d.m.Y" }}</td>
+                <td><strong>{{ c.product.name }}</strong></td>
+                <td>{{ c.expected_quantity }} шт.</td>
+                <td><strong>{{ c.actual_quantity }} шт.</strong></td>
+                <td>{{ c.employee.full_name }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5">Актів інвентаризації ще немає.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

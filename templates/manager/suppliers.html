@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% block title %}Постачальники та замовлення{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Постачальники та замовлення на закупівлю</h1>
+</div>
+
+<div class="card">
+    <h3>Додати нового постачальника</h3>
+    <form method="POST">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_supplier">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Назва компанії</label>
+                <input type="text" name="company_name" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Контактна особа</label>
+                <input type="text" name="contact_person" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Телефон</label>
+                <input type="text" name="phone" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" class="form-control" required>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-secondary">Зберегти постачальника</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>Сформувати замовлення постачальнику</h3>
+    <form method="POST">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_order">
+        <div class="form-group" style="max-width: 450px;">
+            <label>Постачальник</label>
+            <select name="supplier_id" id="order-supplier-select" class="form-control" onchange="filterOrderProducts()" required>
+                {% for s in suppliers %}
+                    <option value="{{ s.id }}">{{ s.company_name }} ({{ s.contact_person }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div id="order-items">
+            <div class="form-row order-row" style="margin-bottom: 10px; align-items: flex-end;">
+                <div class="form-group">
+                    <label>Товар цього постачальника</label>
+                    <select name="product_id[]" class="form-control order-product-select" required>
+                        <option value="">-- Оберіть товар --</option>
+                        {% for p in products %}
+                            <option value="{{ p.id }}" data-supplier="{{ p.supplier_id }}">
+                                {{ p.name }} (Залишок: {{ p.stock_quantity }} шт. | Закуп. ціна: {{ p.purchase_price }} ₴)
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="max-width: 180px;">
+                    <label>Кількість до замовлення</label>
+                    <input type="number" min="1" name="quantity[]" class="form-control" value="10" required>
+                </div>
+                <div class="form-group" style="max-width: 110px;">
+                    <button type="button" class="btn btn-secondary" onclick="removeOrderRow(this)">Видалити</button>
+                </div>
+            </div>
+        </div>
+
+        <button type="button" class="btn btn-secondary" onclick="addOrderRow()" style="margin-bottom: 16px;">+ Додати товар</button>
+        <br>
+        <button type="submit" class="btn btn-primary">Створити замовлення постачальнику</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>📋 Історія замовлень постачальникам</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Замовлення №</th>
+                <th>Дата</th>
+                <th>Постачальник</th>
+                <th>Позиції</th>
+                <th>Сума</th>
+                <th>Статус</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for o in orders %}
+            <tr>
+                <td>#{{ o.id }}</td>
+                <td>{{ o.date|date:"d.m.Y" }}</td>
+                <td><strong>{{ o.supplier.company_name }}</strong></td>
+                <td>
+                    {% for item in o.items.all %}
+                        <div>{{ item.product.name }} — {{ item.quantity }} шт. × {{ item.price }} ₴</div>
+                    {% endfor %}
+                </td>
+                <td><strong>{{ o.total }} ₴</strong></td>
+                <td>
+                    <form method="POST" style="display: flex; gap: 6px;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="update_order_status">
+                        <input type="hidden" name="order_id" value="{{ o.id }}">
+                        <select name="status" class="form-control" style="padding: 4px 8px; width: auto;">
+                            <option value="створено" {% if o.status == 'створено' %}selected{% endif %}>створено</option>
+                            <option value="відправлено" {% if o.status == 'відправлено' %}selected{% endif %}>відправлено</option>
+                            <option value="виконано" {% if o.status == 'виконано' %}selected{% endif %}>виконано</option>
+                            <option value="скасовано" {% if o.status == 'скасовано' %}selected{% endif %}>скасовано</option>
+                        </select>
+                        <button type="submit" class="btn btn-secondary" style="padding: 4px 10px;">ОК</button>
+                    </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6">Замовлень ще не створено.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    function filterOrderProducts() {
+        const selectedSupplierId = document.getElementById('order-supplier-select').value;
+        document.querySelectorAll('.order-product-select').forEach(selectEl => {
+            const currentOption = selectEl.options[selectEl.selectedIndex];
+            if (currentOption && currentOption.value && currentOption.dataset.supplier !== selectedSupplierId) {
+                selectEl.selectedIndex = 0;
+            }
+            Array.from(selectEl.options).forEach(opt => {
+                if (!opt.value) return;
+                const matches = opt.dataset.supplier === selectedSupplierId;
+                opt.hidden = !matches;
+                opt.disabled = !matches;
+            });
+        });
+    }
+
+    function addOrderRow() {
+        const container = document.getElementById('order-items');
+        const firstRow = container.querySelector('.order-row');
+        const newRow = firstRow.cloneNode(true);
+        newRow.querySelector('select').selectedIndex = 0;
+        newRow.querySelector('input').value = 10;
+        container.appendChild(newRow);
+        filterOrderProducts();
+    }
+
+    function removeOrderRow(btn) {
+        const container = document.getElementById('order-items');
+        if (container.querySelectorAll('.order-row').length > 1) {
+            btn.closest('.order-row').remove();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', filterOrderProducts);
+</script>
+{% endblock %}

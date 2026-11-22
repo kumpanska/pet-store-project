@@ -17,7 +17,10 @@ from .helpers import calculate_returns_sum
 @role_required(['директор'])
 def director_dashboard(request):
     today = date.today()
+    date_from_str = request.GET.get('date_from') or today.replace(day=1).isoformat()
+    date_to_str = request.GET.get('date_to') or today.isoformat()
 
+    # Виручка за сьогодні
     today_sales_agg = Sale.objects.filter(date=today).aggregate(
         total_sum=Sum('total'), receipts_count=Count('id')
     )
@@ -28,16 +31,17 @@ def director_dashboard(request):
         'returns_sum': today_returns
     }
 
-    month_sales_agg = Sale.objects.filter(
-        date__year=today.year, date__month=today.month
-    ).aggregate(total_sum=Sum('total'), receipts_count=Count('id'))
-    month_returns = calculate_returns_sum(
-        ReturnProduct.objects.filter(date__year=today.year, date__month=today.month)
+    period_sales_qs = Sale.objects.filter(date__range=[date_from_str, date_to_str])
+    period_sales_agg = period_sales_qs.aggregate(
+        total_sum=Sum('total'), receipts_count=Count('id')
     )
-    sales_month = {
-        'total_sum': (month_sales_agg['total_sum'] or Decimal('0.00')) - month_returns,
-        'receipts_count': month_sales_agg['receipts_count'] or 0,
-        'returns_sum': month_returns
+    period_returns = calculate_returns_sum(
+        ReturnProduct.objects.filter(date__range=[date_from_str, date_to_str])
+    )
+    sales_period = {
+        'total_sum': (period_sales_agg['total_sum'] or Decimal('0.00')) - period_returns,
+        'receipts_count': period_sales_agg['receipts_count'] or 0,
+        'returns_sum': period_returns
     }
 
     all_sales_agg = Sale.objects.aggregate(
@@ -51,14 +55,16 @@ def director_dashboard(request):
     }
 
     low_stock_products = Product.objects.filter(stock_quantity__lt=5)
-    recent_sales = Sale.objects.select_related('employee__store', 'customer').order_by('-date', '-time')[:10]
+    recent_sales = period_sales_qs.select_related('employee__store', 'customer').order_by('-date', '-time')[:20]
     employees_count = Employee.objects.count()
     stores = Store.objects.all()
 
     return render(request, 'director/dashboard.html', {
         'account': request.user_account,
+        'date_from': date_from_str,
+        'date_to': date_to_str,
         'sales_today': sales_today,
-        'sales_month': sales_month,
+        'sales_period': sales_period,
         'sales_all_time': sales_all_time,
         'low_stock_products': low_stock_products,
         'recent_sales': recent_sales,

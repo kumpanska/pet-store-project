@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+{% block title %}Аналітика та звіти{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Аналітика ефективності мережі</h1>
+</div>
+
+<div class="card">
+    <h3>Фільтр періоду та торгової точки</h3>
+    <form method="GET">
+        <div class="form-row" style="align-items: flex-end;">
+            <div class="form-group">
+                <label>Дата з</label>
+                <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+            </div>
+            <div class="form-group">
+                <label>Дата по</label>
+                <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+            </div>
+            <div class="form-group">
+                <label>Торгова точка</label>
+                <select name="store_id" class="form-control">
+                    <option value="">-- Вся мережа --</option>
+                    {% for st in stores %}
+                        <option value="{{ st.id }}" {% if st.id|stringformat:"s" == selected_store_id %}selected{% endif %}>
+                            {{ st.name }} ({{ st.type }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">Сформувати звіт</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h3>📊 Ефективність категорій товарів</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Категорія</th>
+                <th>Продано (шт.)</th>
+                <th>Виручка</th>
+                <th>Валовий прибуток</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cat in category_stats %}
+            <tr>
+                <td><strong>{{ cat.product__category__name }}</strong></td>
+                <td>{{ cat.qty_sold }} шт.</td>
+                <td>{{ cat.revenue|floatformat:2 }} ₴</td>
+                <td><strong>{{ cat.gross_profit|floatformat:2 }} ₴</strong></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4">Немає продажів за обраний період.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>🏆 Топ товарів за виручкою та прибутком</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Штрихкод</th>
+                <th>Товар</th>
+                <th>Продано</th>
+                <th>Виручка</th>
+                <th>Прибуток</th>
+                <th>Залишок</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in top_products %}
+            <tr>
+                <td>{{ p.product__barcode }}</td>
+                <td><strong>{{ p.product__name }}</strong></td>
+                <td>{{ p.qty_sold }} шт.</td>
+                <td>{{ p.revenue|floatformat:2 }} ₴</td>
+                <td><strong>{{ p.gross_profit|floatformat:2 }} ₴</strong></td>
+                <td>{{ p.product__stock_quantity }} шт.</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6">Дані відсутні.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>🏪 Рейтинг магазинів та продавців за період</h3>
+    <div class="form-row">
+        <div class="form-group">
+            <h4>По торгових точках</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Точка</th>
+                        <th>Чеків</th>
+                        <th>Виручка</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in store_stats %}
+                    <tr>
+                        <td><strong>{{ s.employee__store__name|default:"Без точки" }}</strong></td>
+                        <td>{{ s.receipts }}</td>
+                        <td><strong>{{ s.total_revenue|floatformat:2 }} ₴</strong></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3">Немає даних.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="form-group">
+            <h4>По продавцях</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Продавець</th>
+                        <th>Точка</th>
+                        <th>Чеків</th>
+                        <th>Виручка</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for emp in employee_stats %}
+                    <tr>
+                        <td><strong>{{ emp.employee__full_name }}</strong></td>
+                        <td>{{ emp.employee__store__name|default:"—" }}</td>
+                        <td>{{ emp.receipts }}</td>
+                        <td><strong>{{ emp.total_revenue|floatformat:2 }} ₴</strong></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4">Немає даних.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>❄️ Неліквідні товари (жодного продажу за період, але є на складі)</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Штрихкод</th>
+                <th>Товар</th>
+                <th>Залишок на складі</th>
+                <th>Закупівельна ціна</th>
+                <th>Роздрібна ціна</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in illiquid_products %}
+            <tr>
+                <td>{{ item.barcode }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.stock_quantity }} шт.</td>
+                <td>{{ item.purchase_price }} ₴</td>
+                <td>{{ item.sale_price }} ₴</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5">Неліквідних товарів за цей період немає.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

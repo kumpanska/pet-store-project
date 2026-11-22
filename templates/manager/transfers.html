@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}Переміщення товарів{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Переміщення товарів між магазинами та складом</h1>
+</div>
+
+<div class="card">
+    <h3>Оформити накладну на переміщення</h3>
+    <form method="POST">
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-group">
+                <label>Звідки (точка відправлення)</label>
+                <select name="from_store_id" class="form-control" required>
+                    {% for st in stores %}
+                        <option value="{{ st.id }}">{{ st.name }} ({{ st.type }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Куди (точка отримання)</label>
+                <select name="to_store_id" class="form-control" required>
+                    {% for st in stores %}
+                        <option value="{{ st.id }}">{{ st.name }} ({{ st.type }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Товар</label>
+                <select name="product_id" class="form-control" required>
+                    {% for p in products %}
+                        <option value="{{ p.id }}">{{ p.name }} (Доступно: {{ p.stock_quantity }} шт.)</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="max-width: 200px;">
+                <label>Кількість (шт.)</label>
+                <input type="number" min="1" name="quantity" class="form-control" value="1" required>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Провести переміщення</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>📋 Історія переміщень</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Товар</th>
+                <th>Звідки</th>
+                <th>Куди</th>
+                <th>Кількість</th>
+                <th>Відповідальний</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in transfers %}
+            <tr>
+                <td>{{ t.date|date:"d.m.Y" }}</td>
+                <td><strong>{{ t.product.name }}</strong></td>
+                <td>{{ t.from_store.name }}</td>
+                <td>{{ t.to_store.name }}</td>
+                <td>{{ t.quantity }} шт.</td>
+                <td>{{ t.employee.full_name }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6">Переміщень ще не зафіксовано.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

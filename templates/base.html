@@ -11,7 +11,7 @@
 <div class="app-layout">
     <aside class="sidebar">
         <div class="sidebar-brand">
-            <h3>🐾 ZooSystem</h3>
+            <h3>🐾 PetSystem</h3>
             {% if account %}
                 <span>{{ account.employee.full_name }}</span>
                 <span>Роль: <strong>{{ account.role.name }}</strong></span>
@@ -25,18 +25,35 @@
 
         <ul class="sidebar-nav">
             {% if account.role.name == 'директор' %}
-                <li><a href="{% url 'director_dashboard' %}">📊 Аналітика та зведення</a></li>
+                <li><a href="{% url 'director_dashboard' %}">📊 Зведення по мережі</a></li>
+                <li><a href="{% url 'director_analytics' %}">📈 Аналітика та звіти</a></li>
                 <li><a href="{% url 'director_employees' %}">👥 Персонал та доступи</a></li>
                 <li><a href="{% url 'director_stores' %}">🏪 Магазини та склади</a></li>
                 <li><a href="{% url 'director_salaries' %}">💳 Відомість зарплат</a></li>
+
             {% elif account.role.name == 'продавець-консультант' %}
                 <li><a href="{% url 'cashier_dashboard' %}">🖥️ Касова зміна</a></li>
                 <li><a href="{% url 'create_sale' %}">🛒 Новий продаж (Чек)</a></li>
                 <li><a href="{% url 'process_return' %}">↩️ Повернення товару</a></li>
                 <li><a href="{% url 'manage_customers' %}">🐾 Клієнти та знижки</a></li>
-                <li><a href="{% url 'price_control' %}">🏷️ Коригування цін</a></li>
+                <li><a href="{% url 'goods_receipt_create' %}">📦 Прибуткові накладні</a></li>
+                <li><a href="{% url 'price_control' %}">🏷️ Ціни та тижневі акції</a></li>
+
             {% elif account.role.name == 'менеджер' %}
-                <li><a href="{% url 'price_control' %}">🏷️ Коригування цін</a></li>
+                <li><a href="{% url 'manager_dashboard' %}">📋 Панель менеджера</a></li>
+                <li><a href="{% url 'manager_catalog' %}">🗂️ Каталог та категорії</a></li>
+                <li><a href="{% url 'manager_inventory' %}">🔍 Інвентаризація</a></li>
+                <li><a href="{% url 'manager_transfers' %}">🚚 Переміщення товарів</a></li>
+                <li><a href="{% url 'manager_write_offs' %}">🗑️ Акти списання</a></li>
+                <li><a href="{% url 'manager_suppliers' %}">🤝 Постачальники та замовлення</a></li>
+                <li><a href="{% url 'goods_receipt_create' %}">📦 Перегляд накладних</a></li>
+                <li><a href="{% url 'price_control' %}">🏷️ Ціни та тижневі акції</a></li>
+
+            {% elif account.role.name == 'бухгалтер' %}
+                <li><a href="{% url 'accountant_dashboard' %}">💼 Панель бухгалтера</a></li>
+                <li><a href="{% url 'accountant_supplier_payments' %}">💸 Розрахунки з постачальниками</a></li>
+                <li><a href="{% url 'accountant_salaries' %}">💳 Нарахування зарплати</a></li>
+                <li><a href="{% url 'accountant_pnl_report' %}">📑 Звіт про прибутки і збитки</a></li>
             {% endif %}
         </ul>
 

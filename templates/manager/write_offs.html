@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}Списання товарів{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Акти списання товарів</h1>
+</div>
+
+<div class="card">
+    <h3>Оформити акт списання</h3>
+    <form method="POST">
+        {% csrf_token %}
+        <div class="form-group">
+            <label>Причина списання</label>
+            <input type="text" name="reason" class="form-control" placeholder="Закінчення терміну придатності / пошкодження упаковки тощо" required>
+        </div>
+
+        <div id="writeoff-items">
+            <div class="form-row writeoff-row" style="margin-bottom: 10px; align-items: flex-end;">
+                <div class="form-group">
+                    <label>Товар</label>
+                    <select name="product_id[]" class="form-control" required>
+                        {% for p in products %}
+                            <option value="{{ p.id }}">{{ p.name }} (На складі: {{ p.stock_quantity }} шт.)</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="max-width: 180px;">
+                    <label>Кількість до списання</label>
+                    <input type="number" min="1" name="quantity[]" class="form-control" value="1" required>
+                </div>
+                <div class="form-group" style="max-width: 110px;">
+                    <button type="button" class="btn btn-secondary" onclick="removeWriteOffRow(this)">Видалити</button>
+                </div>
+            </div>
+        </div>
+
+        <button type="button" class="btn btn-secondary" onclick="addWriteOffRow()" style="margin-bottom: 16px;">+ Додати товар</button>
+        <br>
+        <button type="submit" class="btn btn-primary">Провести списання зі складу</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>📋 Історія актів списання</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Акт №</th>
+                <th>Дата</th>
+                <th>Причина</th>
+                <th>Списані позиції</th>
+                <th>Оформив</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for act in acts %}
+            <tr>
+                <td>#{{ act.id }}</td>
+                <td>{{ act.date|date:"d.m.Y" }}</td>
+                <td>{{ act.reason }}</td>
+                <td>
+                    {% for item in act.items.all %}
+                        <div>{{ item.product.name }} — <strong>{{ item.quantity }} шт.</strong></div>
+                    {% endfor %}
+                </td>
+                <td>{{ act.employee.full_name }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5">Актів списання ще не було.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    function addWriteOffRow() {
+        const container = document.getElementById('writeoff-items');
+        const firstRow = container.querySelector('.writeoff-row');
+        const newRow = firstRow.cloneNode(true);
+        newRow.querySelector('input').value = 1;
+        container.appendChild(newRow);
+    }
+
+    function removeWriteOffRow(btn) {
+        const container = document.getElementById('writeoff-items');
+        if (container.querySelectorAll('.writeoff-row').length > 1) {
+            btn.closest('.writeoff-row').remove();
+        }
+    }
+</script>
+{% endblock %}

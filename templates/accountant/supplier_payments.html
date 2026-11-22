@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block title %}Розрахунки з постачальниками{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Розрахунки з постачальниками</h1>
+</div>
+
+<div class="card">
+    <h3>Провести оплату за прибутковою накладною</h3>
+    <form method="POST">
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-group">
+                <label>Прибуткова накладна</label>
+                <select name="goods_receipt_id" class="form-control" required>
+                    {% for r in receipts %}
+                        {% if r.balance_due > 0 %}
+                            <option value="{{ r.id }}">
+                                Накладна #{{ r.id }} від {{ r.date|date:"d.m.Y" }} — {{ r.supplier.company_name }} (Сума: {{ r.total }} ₴ | Залишок боргу: {{ r.balance_due }} ₴)
+                            </option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="max-width: 240px;">
+                <label>Сума оплати (₴)</label>
+                <input type="number" step="0.01" min="0.01" name="amount" class="form-control" required>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Зареєструвати оплату</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>Стан розрахунків по накладних</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Накладна №</th>
+                <th>Дата</th>
+                <th>Постачальник</th>
+                <th>Загальна сума</th>
+                <th>Сплачено</th>
+                <th>Залишок боргу</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in receipts %}
+            <tr>
+                <td>#{{ r.id }}</td>
+                <td>{{ r.date|date:"d.m.Y" }}</td>
+                <td><strong>{{ r.supplier.company_name }}</strong></td>
+                <td>{{ r.total }} ₴</td>
+                <td>{{ r.paid_amount }} ₴</td>
+                <td>
+                    {% if r.balance_due > 0 %}
+                        <strong style="color: #dc2626;">{{ r.balance_due }} ₴</strong>
+                    {% else %}
+                        <span style="color: #16a34a;">Сплачено повністю</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6">Прибуткових накладних ще немає.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3>📋 Історія платежів</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Дата платежу</th>
+                <th>Постачальник</th>
+                <th>Накладна</th>
+                <th>Сума</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in payments %}
+            <tr>
+                <td>{{ p.date|date:"d.m.Y" }}</td>
+                <td>{{ p.supplier.company_name }}</td>
+                <td>#{{ p.goods_receipt.id }}</td>
+                <td><strong>{{ p.amount }} ₴</strong></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4">Платежів ще не проведено.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

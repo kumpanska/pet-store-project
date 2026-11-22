@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}Нарахування заробітної плати{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Нарахування заробітної плати</h1>
+</div>
+
+<div class="card">
+    <h3>Нарахувати зарплату за місяць</h3>
+    <form method="POST">
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-group">
+                <label>Співробітник</label>
+                <select name="employee_id" class="form-control" required>
+                    {% for emp in employees %}
+                        <option value="{{ emp.id }}">{{ emp.full_name }} ({{ emp.position }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Місяць нарахування</label>
+                <input type="month" name="period_month" class="form-control" required>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Базова ставка (₴)</label>
+                <input type="number" step="0.01" min="0" name="base_amount" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Автоматична премія (% від особистих продажів за місяць)</label>
+                <input type="number" step="0.1" min="0" name="sales_bonus_percent" class="form-control" value="0">
+            </div>
+            <div class="form-group">
+                <label>Додаткова фіксована премія (₴)</label>
+                <input type="number" step="0.01" min="0" name="manual_bonus" class="form-control" value="0">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Розрахувати та нарахувати зарплату</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3>📋 Відомість нарахувань</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Період</th>
+                <th>Співробітник</th>
+                <th>Точка</th>
+                <th>Ставка</th>
+                <th>Премія</th>
+                <th>Разом до виплати</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in salaries %}
+            <tr>
+                <td>{{ s.period_month|date:"m.Y" }}</td>
+                <td><strong>{{ s.employee.full_name }}</strong></td>
+                <td>{{ s.employee.store.name|default:"Вся мережа" }}</td>
+                <td>{{ s.base_amount }} ₴</td>
+                <td>{{ s.bonus }} ₴</td>
+                <td><strong>{{ s.total }} ₴</strong></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6">Записів ще немає.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}Звіт про прибутки та збитки (P&L){% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Фінансовий звіт про прибутки та збитки (P&L)</h1>
+</div>
+
+<div class="card">
+    <h3>Період звіту</h3>
+    <form method="GET">
+        <div class="form-row" style="align-items: flex-end; max-width: 600px;">
+            <div class="form-group">
+                <label>Дата з</label>
+                <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+            </div>
+            <div class="form-group">
+                <label>Дата по</label>
+                <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+            </div>
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">Сформувати P&L</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="card" style="max-width: 750px;">
+    <h3>Показники за період: {{ date_from }} — {{ date_to }}</h3>
+    <table>
+        <tbody>
+            <tr>
+                <td>Валова виручка від продажів</td>
+                <td>{{ gross_sales|floatformat:2 }} ₴</td>
+            </tr>
+            <tr>
+                <td>Повернення товарів покупцями</td>
+                <td style="color: #dc2626;">-{{ returns_sum|floatformat:2 }} ₴</td>
+            </tr>
+            <tr>
+                <td><strong>Чиста виручка (Net Revenue)</strong></td>
+                <td><strong>{{ net_revenue|floatformat:2 }} ₴</strong></td>
+            </tr>
+            <tr>
+                <td>Собівартість реалізованих товарів (COGS)</td>
+                <td style="color: #dc2626;">-{{ cogs|floatformat:2 }} ₴</td>
+            </tr>
+            <tr>
+                <td><strong>Валовий прибуток (Gross Profit)</strong></td>
+                <td><strong>{{ gross_profit|floatformat:2 }} ₴</strong></td>
+            </tr>
+            <tr>
+                <td>Витрати на оплату праці (ФОП)</td>
+                <td style="color: #dc2626;">-{{ payroll_expenses|floatformat:2 }} ₴</td>
+            </tr>
+            <tr>
+                <td>Збитки від списання товарів</td>
+                <td style="color: #dc2626;">-{{ write_offs_loss|floatformat:2 }} ₴</td>
+            </tr>
+            <tr>
+                <td><strong>Чистий прибуток / збиток (Net Profit)</strong></td>
+                <td>
+                    <strong style="font-size: 1.15em; color: {% if net_profit >= 0 %}#16a34a{% else %}#dc2626{% endif %};">
+                        {{ net_profit|floatformat:2 }} ₴
+                    </strong>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p style="margin-top: 14px; color: #575C55; font-size: 0.9em;">
+        Довідково: обсяг закупівель від постачальників за обраний період склав <strong>{{ purchases_total|floatformat:2 }} ₴</strong>.
+    </p>
+
+    <div style="margin-top: 16px;">
+        <button type="button" class="btn btn-secondary" onclick="window.print()">🖨️ Роздрукувати звіт</button>
+    </div>
+</div>
+{% endblock %}

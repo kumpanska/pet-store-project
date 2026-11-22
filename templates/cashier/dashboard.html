@@ -6,17 +6,6 @@
     <h1>Робоче місце продавця-консультанта</h1>
 </div>
 
-<div class="card" style="display: flex; gap: 10px; flex-wrap: wrap;">
-    <a href="{% url 'create_sale' %}" class="btn btn-primary">🛒 Новий чек</a>
-    <a href="{% url 'process_return' %}" class="btn btn-secondary">↩️ Повернення товару</a>
-    <a href="{% url 'manage_customers' %}" class="btn btn-secondary">👥 Програма лояльності</a>
-    <a href="{% url 'goods_receipt_create' %}" class="btn btn-secondary">📦 Прибуткові накладні</a>
-    <a href="{% url 'price_control' %}" class="btn btn-secondary">🏷️ Ціни та тижневі акції</a>
-    {% if active_shift %}
-        <a href="{% url 'shift_x_report' %}" class="btn btn-secondary">🧾 Сформувати X-звіт</a>
-    {% endif %}
-</div>
-
 <div class="card">
     <h3>Управління касовою зміною</h3>
     {% if active_shift %}
@@ -37,7 +26,7 @@
         </div>
         {% endif %}
 
-        <form method="POST" action="{% url 'shift_manage' %}" style="max-width: 420px;">
+        <form method="POST" action="{% url 'shift_manage' %}" style="max-width: 440px;">
             {% csrf_token %}
             <input type="hidden" name="action" value="close">
             <div class="form-group">
@@ -46,7 +35,7 @@
             </div>
             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                 <button type="submit" class="btn btn-secondary">Закрити зміну (Z-звіт)</button>
-                <a href="{% url 'shift_x_report' %}" class="btn btn-secondary">X-звіт</a>
+                <a href="{% url 'shift_x_report' %}" class="btn btn-secondary">🧾 X-звіт</a>
                 <a href="{% url 'create_sale' %}" class="btn btn-primary">Перейти до каси →</a>
             </div>
         </form>
