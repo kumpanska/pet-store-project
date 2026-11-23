@@ -38,6 +38,7 @@
                 <li><a href="{% url 'manage_customers' %}">🐾 Клієнти та знижки</a></li>
                 <li><a href="{% url 'goods_receipt_create' %}">📦 Прибуткові накладні</a></li>
                 <li><a href="{% url 'price_control' %}">🏷️ Ціни та тижневі акції</a></li>
+                <li><a href="{% url 'manage_online_orders' %}">🌐 Інтернет-замовлення</a></li>
 
             {% elif account.role.name == 'менеджер' %}
                 <li><a href="{% url 'manager_dashboard' %}">📋 Панель менеджера</a></li>
@@ -48,6 +49,7 @@
                 <li><a href="{% url 'manager_suppliers' %}">🤝 Постачальники та замовлення</a></li>
                 <li><a href="{% url 'goods_receipt_create' %}">📦 Перегляд накладних</a></li>
                 <li><a href="{% url 'price_control' %}">🏷️ Ціни та тижневі акції</a></li>
+                <li><a href="{% url 'manage_online_orders' %}">🌐 Інтернет-замовлення</a></li>
 
             {% elif account.role.name == 'бухгалтер' %}
                 <li><a href="{% url 'accountant_dashboard' %}">💼 Панель бухгалтера</a></li>

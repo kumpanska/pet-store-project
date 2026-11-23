@@ -6,8 +6,9 @@ from django.db.models import Sum
 from django.contrib import messages
 
 from ..models import (
-    Product, Customer, Sale, SaleItem, ReturnProduct,
-    WorkShift, Supplier, GoodsReceipt, GoodsReceiptItem
+    Product, ProductCategory, Supplier, Customer, Store, ProductStock,
+    Sale, SaleItem, ReturnProduct, WorkShift,
+    GoodsReceipt, GoodsReceiptItem, OnlineOrder
 )
 from ..permissions import role_required
 from .helpers import (
@@ -417,4 +418,121 @@ def goods_receipt_create(request):
         'suppliers': Supplier.objects.all(),
         'products': Product.objects.select_related('category', 'supplier').all(),
         'receipts': receipts,
+    })
+
+
+@role_required(['продавець-консультант', 'менеджер'])
+def manage_online_orders(request):
+    if request.method == 'POST':
+        order = get_object_or_404(OnlineOrder.objects.prefetch_related('items__product'), id=request.POST.get('order_id'))
+        action = request.POST.get('action')
+
+        if action == 'change_status':
+            new_status = request.POST.get('status')
+            if new_status == 'скасовано' and order.status != 'скасовано' and not order.sale_id:
+                with transaction.atomic():
+                    target_store = order.pickup_store or Store.objects.first()
+                    for item in order.items.all():
+                        if target_store:
+                            ps, _ = ProductStock.objects.get_or_create(
+                                product=item.product, store=target_store, defaults={'quantity': 0}
+                            )
+                            ps.quantity += item.quantity
+                            ps.save(update_fields=['quantity'])
+                        total_qty = ProductStock.objects.filter(product=item.product).aggregate(s=Sum('quantity'))['s'] or 0
+                        item.product.stock_quantity = total_qty
+                        item.product.save(update_fields=['stock_quantity'])
+
+            order.status = new_status
+            order.save(update_fields=['status'])
+            messages.success(request, f'Статус інтернет-замовлення №{order.id} змінено на "{new_status}".')
+            return redirect('manage_online_orders')
+
+        if action == 'complete_with_sale':
+            if request.user_account.role.name.lower() != 'продавець-консультант':
+                messages.error(request, 'Пробити фіскальний чек при видачі може лише продавець-консультант.')
+                return redirect('manage_online_orders')
+
+            employee = request.user_account.employee
+            active_shift = WorkShift.objects.filter(employee=employee, close_time__isnull=True).first()
+            if not active_shift:
+                messages.error(request, 'Відкрийте касову зміну, щоб видати замовлення та провести чек!')
+                return redirect('manage_online_orders')
+
+            if order.sale_id:
+                messages.info(request, f'Замовлення №{order.id} вже проведено чеком №{order.sale_id}.')
+                return redirect('manage_online_orders')
+
+            pay_method = request.POST.get('sale_payment_method', 'картка')
+            with transaction.atomic():
+                sale = Sale.objects.create(
+                    date=date.today(),
+                    time=datetime.now().time(),
+                    payment_method=pay_method,
+                    total=order.total,
+                    customer=order.customer,
+                    employee=employee,
+                )
+                for item in order.items.all():
+                    SaleItem.objects.create(
+                        receipt=sale,
+                        product=item.product,
+                        quantity=item.quantity,
+                        sale_price=item.unit_price,
+                        discount=item.discount,
+                    )
+
+                active_shift.total_sales += sale.total
+                active_shift.save(update_fields=['total_sales'])
+
+                order.status = 'виконано'
+                order.is_paid = True
+                order.sale = sale
+                order.save(update_fields=['status', 'is_paid', 'sale'])
+
+            messages.success(request, f'Інтернет-замовлення №{order.id} видано! Проведено чек №{sale.id} на суму {sale.total} грн.')
+            return redirect('manage_online_orders')
+
+        if action == 'complete_delivery_sale':
+            if order.sale_id:
+                messages.info(request, f'Замовлення №{order.id} вже проведено чеком №{order.sale_id}.')
+                return redirect('manage_online_orders')
+
+            employee = request.user_account.employee
+            with transaction.atomic():
+                sale = Sale.objects.create(
+                    date=date.today(),
+                    time=datetime.now().time(),
+                    payment_method='картка',
+                    total=order.total,
+                    customer=order.customer,
+                    employee=employee,
+                )
+                for item in order.items.all():
+                    SaleItem.objects.create(
+                        receipt=sale,
+                        product=item.product,
+                        quantity=item.quantity,
+                        sale_price=item.unit_price,
+                        discount=item.discount,
+                    )
+
+                active_shift = WorkShift.objects.filter(employee=employee, close_time__isnull=True).first()
+                if active_shift:
+                    active_shift.total_sales += sale.total
+                    active_shift.save(update_fields=['total_sales'])
+
+                if order.status in ('нове', 'збирається'):
+                    order.status = 'відправлено'
+                order.is_paid = True
+                order.sale = sale
+                order.save(update_fields=['status', 'is_paid', 'sale'])
+
+            messages.success(request, f'Чек №{sale.id} за доставку замовлення №{order.id} проведено ({sale.total} грн).')
+            return redirect('manage_online_orders')
+
+    orders = OnlineOrder.objects.select_related('pickup_store', 'customer', 'sale').prefetch_related('items__product').order_by('-created_at')
+    return render(request, 'cashier/online_orders.html', {
+        'account': request.user_account,
+        'orders': orders,
     })

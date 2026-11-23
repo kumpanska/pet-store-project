@@ -1,6 +1,6 @@
 from django.db import models
 from django.db.models import F, ExpressionWrapper, DecimalField
-
+from django.utils import timezone
 
 class ProductCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -306,3 +306,48 @@ class SupplierPayment(models.Model):
     class Meta:
         managed = False
         db_table = 'supplier_payment'
+
+class ProductStock(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='store_stocks', db_column='product_id')
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, db_column='store_id')
+    quantity = models.IntegerField(default=0)
+
+    class Meta:
+        managed = False
+        db_table = 'product_stock'
+        unique_together = ('product', 'store')
+
+    def __str__(self):
+        return f"{self.product.name} @ {self.store.name}: {self.quantity}"
+
+
+class OnlineOrder(models.Model):
+    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, db_column='customer_id')
+    customer_name = models.CharField(max_length=150)
+    customer_phone = models.CharField(max_length=20)
+    delivery_type = models.CharField(max_length=30)
+    pickup_store = models.ForeignKey(Store, on_delete=models.SET_NULL, null=True, blank=True, db_column='pickup_store_id')
+    delivery_address = models.TextField(blank=True, null=True)
+    payment_method = models.CharField(max_length=30)
+    is_paid = models.BooleanField(default=False)
+    status = models.CharField(max_length=30, default='нове')
+    total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    comment = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    sale = models.ForeignKey(Sale, on_delete=models.SET_NULL, null=True, blank=True, db_column='sale_id')
+
+    class Meta:
+        managed = False
+        db_table = 'online_order'
+
+
+class OnlineOrderItem(models.Model):
+    online_order = models.ForeignKey(OnlineOrder, on_delete=models.CASCADE, related_name='items', db_column='online_order_id')
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, db_column='product_id')
+    quantity = models.IntegerField()
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    discount = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+
+    class Meta:
+        managed = False
+        db_table = 'online_order_item'

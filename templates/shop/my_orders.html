@@ -1,0 +1,56 @@
+{% extends 'shop/base_shop.html' %}
+{% block title %}Мої замовлення — ZooSystem Shop{% endblock %}
+
+{% block content %}
+<h1>Відстеження замовлень</h1>
+
+<div class="card">
+    <form method="GET" style="display: flex; gap: 10px; max-width: 500px;">
+        <input type="text" name="phone" class="form-control" placeholder="Введіть ваш телефон (+380...)" value="{{ phone }}" required>
+        <button type="submit" class="btn btn-primary">Знайти замовлення</button>
+    </form>
+</div>
+
+{% if phone %}
+    <div class="card">
+        <h3>Замовлення за номером {{ phone }}</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>№ / Дата</th>
+                    <th>Отримання</th>
+                    <th>Товари</th>
+                    <th>Оплата</th>
+                    <th>Сума</th>
+                    <th>Статус</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in orders %}
+                <tr>
+                    <td><strong>#{{ o.id }}</strong><br><small>{{ o.created_at|date:"d.m.Y H:i" }}</small></td>
+                    <td>
+                        <strong>{{ o.delivery_type|capfirst }}</strong><br>
+                        {% if o.pickup_store %}
+                            <small>{{ o.pickup_store.name }} ({{ o.pickup_store.address|default:"" }})</small>
+                        {% else %}
+                            <small>{{ o.delivery_address }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% for item in o.items.all %}
+                            <div>{{ item.product.name }} — {{ item.quantity }} шт.</div>
+                        {% endfor %}
+                    </td>
+                    <td>{{ o.payment_method }} ({% if o.is_paid %}Сплачено{% else %}При отриманні{% endif %})</td>
+                    <td><strong>{{ o.total }} ₴</strong></td>
+                    <td><strong>{{ o.status|upper }}</strong></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6">Замовлень за цим номером не знайдено.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}
+{% endblock %}

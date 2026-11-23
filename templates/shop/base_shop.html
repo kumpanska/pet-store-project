@@ -1,0 +1,42 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ZooSystem Shop — Інтернет-зоомагазин{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <style>
+        .shop-header { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .shop-container { max-width: 1200px; margin: 24px auto; padding: 0 20px; }
+        .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 18px; }
+        .product-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; }
+        .stock-list { font-size: 0.85em; background: #f8f9fa; padding: 8px 10px; border-radius: 6px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <header class="shop-header">
+        <div>
+            <a href="{% url 'shop_catalog' %}" style="text-decoration: none; color: inherit;">
+                <h2 style="margin: 0;">🐾 ZooSystem Shop</h2>
+            </a>
+        </div>
+        <nav style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+            <a href="{% url 'shop_catalog' %}" class="btn btn-secondary">Каталог товарів</a>
+            <a href="{% url 'shop_my_orders' %}" class="btn btn-secondary">📦 Мої замовлення</a>
+            <a href="{% url 'shop_checkout' %}" class="btn btn-primary">🛒 Кошик ({{ cart_count|default:"0" }})</a>
+            <a href="{% url 'login' %}" style="font-size: 0.9em; color: #575C55; margin-left: 8px;">Вхід для персоналу</a>
+        </nav>
+    </header>
+
+    <div class="shop-container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block title %}Інтернет-замовлення клієнтів{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🌐 Інтернет-замовлення клієнтів</h1>
+</div>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>№ / Дата</th>
+                <th>Клієнт</th>
+                <th>Отримання</th>
+                <th>Товари</th>
+                <th>Сума / Оплата</th>
+                <th>Статус і дії</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for o in orders %}
+            <tr>
+                <td><strong>#{{ o.id }}</strong><br><small>{{ o.created_at|date:"d.m.Y H:i" }}</small></td>
+                <td><strong>{{ o.customer_name }}</strong><br><small>{{ o.customer_phone }}</small></td>
+                <td>
+                    <strong>{{ o.delivery_type|capfirst }}</strong><br>
+                    {% if o.pickup_store %}
+                        <small>{{ o.pickup_store.name }}</small>
+                    {% else %}
+                        <small>{{ o.delivery_address }}</small>
+                    {% endif %}
+                    {% if o.comment %}
+                        <div style="font-size: 0.85em; color: #d97706; margin-top: 3px;">📝 {{ o.comment }}</div>
+                    {% endif %}
+                </td>
+                <td>
+                    {% for item in o.items.all %}
+                        <div>{{ item.product.name }} — {{ item.quantity }} шт.</div>
+                    {% endfor %}
+                </td>
+                <td>
+                    <strong>{{ o.total }} ₴</strong><br>
+                    <small>{{ o.payment_method }} ({% if o.is_paid %}✅ Сплачено{% else %}⏳ Не оплачено{% endif %})</small>
+                </td>
+                <td>
+                    <form method="POST" style="display: flex; gap: 6px; margin-bottom: 6px;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="change_status">
+                        <input type="hidden" name="order_id" value="{{ o.id }}">
+                        <select name="status" class="form-control" style="padding: 4px 8px; width: auto;">
+                            <option value="нове" {% if o.status == 'нове' %}selected{% endif %}>нове</option>
+                            <option value="збирається" {% if o.status == 'збирається' %}selected{% endif %}>збирається</option>
+                            <option value="готове до видачі" {% if o.status == 'готове до видачі' %}selected{% endif %}>готове до видачі</option>
+                            <option value="відправлено" {% if o.status == 'відправлено' %}selected{% endif %}>відправлено</option>
+                            <option value="виконано" {% if o.status == 'виконано' %}selected{% endif %}>виконано</option>
+                            <option value="скасовано" {% if o.status == 'скасовано' %}selected{% endif %}>скасовано</option>
+                        </select>
+                        <button type="submit" class="btn btn-secondary" style="padding: 4px 10px;">ОК</button>
+                    </form>
+
+                    {% if not o.sale_id and o.status != 'скасовано' %}
+                        {% if o.delivery_type == 'самовивіз' and account.role.name|lower == 'продавець-консультант' %}
+                        <form method="POST" style="display: flex; gap: 6px;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="complete_with_sale">
+                            <input type="hidden" name="order_id" value="{{ o.id }}">
+                            <select name="sale_payment_method" class="form-control" style="padding: 4px 8px; width: auto;">
+                                <option value="картка" {% if o.is_paid %}selected{% endif %}>Картка</option>
+                                <option value="готівка">Готівка</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary" style="padding: 4px 10px; font-size: 0.85em;">Видати і чек</button>
+                        </form>
+                        {% elif o.delivery_type == 'доставка' %}
+                        <form method="POST" style="display: flex; gap: 6px;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="complete_delivery_sale">
+                            <input type="hidden" name="order_id" value="{{ o.id }}">
+                            <button type="submit" class="btn btn-primary" style="padding: 4px 10px; font-size: 0.85em;">
+                                🚚 Провести чек доставки (картка)
+                            </button>
+                        </form>
+                        {% endif %}
+                    {% elif o.sale_id %}
+                        <small style="color: #16a34a;">🧾 Чек №{{ o.sale_id }} проведено</small>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6">Інтернет-замовлень ще немає.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

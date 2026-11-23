@@ -1,0 +1,192 @@
+{% extends 'shop/base_shop.html' %}
+{% block title %}Кошик та оформлення замовлення{% endblock %}
+
+{% block content %}
+<h1>Кошик та оформлення замовлення</h1>
+
+{% if not cart_items %}
+    <div class="card">
+        <p>Ваш кошик наразі порожній.</p>
+        <a href="{% url 'shop_catalog' %}" class="btn btn-primary">Перейти до каталогу →</a>
+    </div>
+{% else %}
+    <div class="card">
+        <h3>Перевірити персональну знижку постійного клієнта</h3>
+        <form method="GET" style="display: flex; gap: 10px; max-width: 500px;">
+            <input type="text" name="phone" class="form-control" placeholder="+380..." value="{{ phone_lookup }}">
+            <button type="submit" class="btn btn-secondary">Застосувати знижку</button>
+        </form>
+        {% if customer %}
+            <p style="color: #16a34a; margin-top: 8px;">
+                ✅ Вітаємо, <strong>{{ customer.full_name }}</strong>! Ваша персональна знижка: <strong>{{ customer_discount|floatformat:0 }}%</strong>.
+            </p>
+        {% elif phone_lookup %}
+            <p style="color: #575C55; margin-top: 8px;">Новий клієнт — при оформленні ви автоматично отримаєте стартову картку лояльності зі знижкою <strong>3%</strong> на наступні покупки!</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h3>Обрані товари</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Товар</th>
+                    <th>Ціна</th>
+                    <th>Знижка</th>
+                    <th>Кількість</th>
+                    <th>Сума</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in cart_items %}
+                <tr class="cart-item-row"
+                    data-name="{{ item.product.name }}"
+                    data-qty="{{ item.quantity }}"
+                    data-stocks="{% for st_id, q in item.stock_by_store.items %}{{ st_id }}:{{ q }};{% endfor %}">
+                    <td><strong>{{ item.product.name }}</strong></td>
+                    <td>{{ item.product.sale_price }} ₴</td>
+                    <td>{% if item.applied_discount > 0 %}-{{ item.applied_discount|floatformat:0 }}%{% else %}—{% endif %}</td>
+                    <td>
+                        <form method="POST" action="{% url 'shop_cart_action' %}" style="display: flex; gap: 6px; width: 130px;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="update">
+                            <input type="hidden" name="product_id" value="{{ item.product.id }}">
+                            <input type="number" name="quantity" class="form-control" min="1" max="{{ item.product.stock_quantity }}" value="{{ item.quantity }}" style="padding: 4px;">
+                            <button type="submit" class="btn btn-secondary" style="padding: 4px 8px;">ОК</button>
+                        </form>
+                    </td>
+                    <td><strong>{{ item.final_line }} ₴</strong></td>
+                    <td>
+                        <form method="POST" action="{% url 'shop_cart_action' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="remove">
+                            <input type="hidden" name="product_id" value="{{ item.product.id }}">
+                            <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; color: #dc2626;">✕</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div style="text-align: right; margin-top: 14px; font-size: 1.15em;">
+            {% if discount_saved > 0 %}
+                <div>Економія за знижками: <strong style="color: #16a34a;">-{{ discount_saved }} ₴</strong></div>
+            {% endif %}
+            <div>До сплати: <strong style="font-size: 1.3em;">{{ total_with_discount }} ₴</strong></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Дані отримувача та спосіб отримання</h3>
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="place_order">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Ваше ПІБ</label>
+                    <input type="text" name="customer_name" class="form-control" value="{{ customer.full_name|default:'' }}" required>
+                </div>
+                <div class="form-group">
+                    <label>Контактний телефон</label>
+                    <input type="text" name="customer_phone" class="form-control" placeholder="+380..." value="{{ phone_lookup }}" required>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Спосіб отримання</label>
+                    <select name="delivery_type" id="delivery-type-select" class="form-control" onchange="toggleDeliveryFields()">
+                        <option value="самовивіз">Самовивіз із магазину (безкоштовно)</option>
+                        <option value="доставка">Доставка кур'єром / Новою Поштою</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="pickup-store-group">
+                    <label>Оберіть магазин для самовивозу</label>
+                    <select name="pickup_store_id" id="pickup-store-select" class="form-control" onchange="checkStoreAvailability()">
+                        {% for st in pickup_stores %}
+                            <option value="{{ st.id }}">{{ st.name }}{% if st.address %} — {{ st.address }}{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group" id="delivery-address-group" style="display: none;">
+                    <label>Місто та адреса / відділення пошти</label>
+                    <input type="text" name="delivery_address" class="form-control" placeholder="м. Черкаси, відділення НП №5">
+                </div>
+            </div>
+
+            <div id="store-availability-alert" style="margin-bottom: 14px; padding: 10px 12px; border-radius: 6px; background: #f8f9fa;"></div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Спосіб оплати</label>
+                    <select name="payment_method" class="form-control">
+                        <option value="при отриманні">При отриманні (готівкою або карткою)</option>
+                        <option value="онлайн карткою">Онлайн-оплата карткою на сайті</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Коментар до замовлення</label>
+                    <input type="text" name="comment" class="form-control" placeholder="Побажання щодо часу або пакування">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Підтвердити замовлення</button>
+        </form>
+    </div>
+{% endif %}
+
+<script>
+    function toggleDeliveryFields() {
+        const type = document.getElementById('delivery-type-select')?.value;
+        const pickupGroup = document.getElementById('pickup-store-group');
+        const addressGroup = document.getElementById('delivery-address-group');
+        const alertBox = document.getElementById('store-availability-alert');
+
+        if (type === 'самовивіз') {
+            pickupGroup.style.display = 'block';
+            addressGroup.style.display = 'none';
+            checkStoreAvailability();
+        } else {
+            pickupGroup.style.display = 'none';
+            addressGroup.style.display = 'block';
+            alertBox.innerHTML = '🚚 Відправка буде здійснена з головного складу мережі.';
+        }
+    }
+
+    function checkStoreAvailability() {
+        const storeSelect = document.getElementById('pickup-store-select');
+        const alertBox = document.getElementById('store-availability-alert');
+        if (!storeSelect || !alertBox) return;
+
+        const storeId = storeSelect.value;
+        const missing = [];
+
+        document.querySelectorAll('.cart-item-row').forEach(row => {
+            const name = row.dataset.name;
+            const needQty = parseInt(row.dataset.qty, 10);
+            const stocksStr = row.dataset.stocks || '';
+            let haveQty = 0;
+
+            stocksStr.split(';').forEach(pair => {
+                const [sId, q] = pair.split(':');
+                if (sId === storeId) haveQty = parseInt(q || '0', 10);
+            });
+
+            if (haveQty < needQty) {
+                missing.push(`${name} (в магазині є ${haveQty} із ${needQty} шт.)`);
+            }
+        });
+
+        if (missing.length === 0) {
+            alertBox.innerHTML = '<span style="color: #16a34a;">✅ Усі товари з кошика є в наявності в обраному магазині — можна забрати сьогодні!</span>';
+        } else {
+            alertBox.innerHTML = `<span style="color: #d97706;">⚠️ Потрібне підвезення зі складу (1 день) для позицій: <strong>${missing.join(', ')}</strong>.</span>`;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', toggleDeliveryFields);
+</script>
+{% endblock %}

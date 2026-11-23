@@ -14,6 +14,7 @@ from .cashier import (
     process_return,
     manage_customers,
     goods_receipt_create,
+    manage_online_orders,
 )
 from .manager import (
     manager_dashboard,
@@ -30,3 +31,9 @@ from .accountant import (
     accountant_pnl_report,
 )
 from .shared import price_control
+from .shop import (
+    shop_catalog,
+    shop_cart_action,
+    shop_checkout,
+    shop_my_orders,
+)

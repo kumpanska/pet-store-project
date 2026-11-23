@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.urls import path
 from pet_store_project import views
+from .views.shop import shop_catalog, shop_cart_action, shop_checkout, shop_my_orders
+from .views.cashier import manage_online_orders
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -36,4 +38,13 @@ urlpatterns = [
     path('accountant/supplier-payments/', views.accountant_supplier_payments, name='accountant_supplier_payments'),
     path('accountant/salaries/', views.accountant_salaries, name='accountant_salaries'),
     path('accountant/pnl/', views.accountant_pnl_report, name='accountant_pnl_report'),
+
+# Інтернет-магазин (вітрина для клієнтів)
+    path('shop/', shop_catalog, name='shop_catalog'),
+    path('shop/cart/', shop_cart_action, name='shop_cart_action'),
+    path('shop/checkout/', shop_checkout, name='shop_checkout'),
+    path('shop/orders/', shop_my_orders, name='shop_my_orders'),
+
+    # Інтернет-замовлення для персоналу
+    path('cashier/online-orders/', manage_online_orders, name='manage_online_orders'),
 ]
