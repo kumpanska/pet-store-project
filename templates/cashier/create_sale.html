@@ -11,15 +11,30 @@
         {% csrf_token %}
         <div class="form-row">
             <div class="form-group">
-                <label>Постійний клієнт (для застосування знижки)</label>
-                <select name="customer_id" id="customer-select" class="form-control" onchange="recalculateTotal()">
-                    <option value="" data-discount="0">-- Без картки клієнта (0%) --</option>
+                <label>Постійний клієнт (пошук за ПІБ або телефоном)</label>
+                <input type="hidden" name="customer_id" id="customer-id-hidden" value="" data-discount="0">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text"
+                           id="customer-search-input"
+                           class="form-control"
+                           list="customers-datalist"
+                           placeholder="Введіть телефон (+380...) або прізвище клієнта..."
+                           autocomplete="off"
+                           oninput="syncSelectedCustomer()">
+                    <button type="button" class="btn btn-secondary" onclick="clearSelectedCustomer()" title="Очистити вибір клієнта">✕</button>
+                </div>
+                <small id="selected-customer-badge" style="display: block; margin-top: 4px; color: #575C55;">
+                    Без картки клієнта (знижка 0%)
+                </small>
+
+                <datalist id="customers-datalist">
                     {% for c in customers %}
-                        <option value="{{ c.id }}" data-discount="{{ c.discount_percent }}">
-                            {{ c.full_name }} ({{ c.phone }}) — Знижка {{ c.discount_percent|floatformat:0 }}%
+                        <option value="{{ c.full_name }} ({{ c.phone }}) — Знижка {{ c.discount_percent|floatformat:0 }}%"
+                                data-id="{{ c.id }}"
+                                data-discount="{{ c.discount_percent|stringformat:'s' }}">
                         </option>
                     {% endfor %}
-                </select>
+                </datalist>
             </div>
             <div class="form-group">
                 <label>Спосіб оплати</label>
@@ -69,6 +84,40 @@
 </div>
 
 <script>
+    function syncSelectedCustomer() {
+        const input = document.getElementById('customer-search-input');
+        const hiddenInput = document.getElementById('customer-id-hidden');
+        const badge = document.getElementById('selected-customer-badge');
+        const options = document.querySelectorAll('#customers-datalist option');
+
+        const val = input.value.trim();
+        let matchedOption = null;
+
+        options.forEach(opt => {
+            if (opt.value === val) {
+                matchedOption = opt;
+            }
+        });
+
+        if (matchedOption) {
+            hiddenInput.value = matchedOption.dataset.id;
+            hiddenInput.dataset.discount = (matchedOption.dataset.discount || '0').replace(',', '.');
+            badge.innerHTML = `<strong style="color: #16a34a;">✅ Обрано: ${matchedOption.value}</strong>`;
+        } else {
+            hiddenInput.value = '';
+            hiddenInput.dataset.discount = '0';
+            badge.textContent = val ? 'Оберіть клієнта зі списку підказок (інакше знижка 0%)' : 'Без картки клієнта (знижка 0%)';
+        }
+
+        recalculateTotal();
+    }
+
+    function clearSelectedCustomer() {
+        const input = document.getElementById('customer-search-input');
+        input.value = '';
+        syncSelectedCustomer();
+    }
+
     function addRow() {
         const container = document.getElementById('items-container');
         const firstRow = container.querySelector('.item-row');
@@ -87,15 +136,15 @@
     }
 
     function recalculateTotal() {
-        const customerSelect = document.getElementById('customer-select');
-        const customerDiscount = parseFloat(customerSelect.options[customerSelect.selectedIndex]?.dataset.discount || 0);
+        const hiddenInput = document.getElementById('customer-id-hidden');
+        const customerDiscount = parseFloat(hiddenInput?.dataset.discount || 0);
         let total = 0;
 
         document.querySelectorAll('.item-row').forEach(row => {
             const prodSelect = row.querySelector('.product-select');
             const option = prodSelect.options[prodSelect.selectedIndex];
-            const price = parseFloat(option?.dataset.price || 0);
-            const promo = parseFloat(option?.dataset.promo || 0);
+            const price = parseFloat((option?.dataset.price || '0').replace(',', '.'));
+            const promo = parseFloat((option?.dataset.promo || '0').replace(',', '.'));
             const qty = parseInt(row.querySelector('.qty-input').value || 0);
             const appliedDiscount = Math.max(customerDiscount, promo);
 

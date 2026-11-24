@@ -60,6 +60,33 @@
 
 <div class="card">
     <h3>📋 Реєстр прибуткових накладних</h3>
+
+    <form method="GET" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; background: #f8f9fa; padding: 12px; border-radius: 8px;">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 0.85em;">Дата з:</label>
+            <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 0.85em;">по:</label>
+            <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+        </div>
+        <div class="form-group" style="margin-bottom: 0; min-width: 240px;">
+            <label style="font-size: 0.85em;">Постачальник:</label>
+            <select name="supplier_id" class="form-control">
+                <option value="">-- Усі постачальники --</option>
+                {% for s in suppliers %}
+                    <option value="{{ s.id }}" {% if selected_supplier == s.id|stringformat:"s" %}selected{% endif %}>
+                        {{ s.company_name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Показати</button>
+        {% if date_from or date_to or selected_supplier %}
+            <a href="{{ request.path }}" class="btn btn-secondary">Скинути фільтр</a>
+        {% endif %}
+    </form>
+
     <table>
         <thead>
             <tr>
@@ -137,7 +164,7 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="5">Прибуткових накладних ще не оформлено.</td></tr>
+            <tr><td colspan="5">Прибуткових накладних за обраними параметрами не знайдено.</td></tr>
             {% endfor %}
         </tbody>
     </table>

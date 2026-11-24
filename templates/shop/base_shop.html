@@ -12,6 +12,7 @@
         .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 18px; }
         .product-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; }
         .stock-list { font-size: 0.85em; background: #f8f9fa; padding: 8px 10px; border-radius: 6px; margin: 10px 0; }
+        .customer-pill { background: #f1f5f9; padding: 6px 12px; border-radius: 20px; font-size: 0.9em; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -21,11 +22,22 @@
                 <h2 style="margin: 0;">🐾 ZooSystem Shop</h2>
             </a>
         </div>
-        <nav style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+        <nav style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <a href="{% url 'shop_catalog' %}" class="btn btn-secondary">Каталог товарів</a>
             <a href="{% url 'shop_my_orders' %}" class="btn btn-secondary">📦 Мої замовлення</a>
             <a href="{% url 'shop_checkout' %}" class="btn btn-primary">🛒 Кошик ({{ cart_count|default:"0" }})</a>
-            <a href="{% url 'login' %}" style="font-size: 0.9em; color: #575C55; margin-left: 8px;">Вхід для персоналу</a>
+
+            {% if shop_customer %}
+                <span class="customer-pill">
+                    👤 {{ shop_customer.full_name }} (-{{ shop_customer.discount_percent|floatformat:0 }}%)
+                </span>
+                <a href="{% url 'shop_logout' %}" class="btn btn-secondary">Вийти</a>
+            {% else %}
+                <a href="{% url 'shop_login' %}" class="btn btn-secondary">Увійти</a>
+                <a href="{% url 'shop_register' %}" class="btn btn-secondary">Реєстрація</a>
+            {% endif %}
+
+            <a href="{% url 'login' %}" style="font-size: 0.85em; color: #575C55; margin-left: 6px;">Для персоналу</a>
         </nav>
     </header>
 

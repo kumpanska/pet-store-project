@@ -4,6 +4,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.db import transaction
 from django.db.models import Sum
 from django.contrib import messages
+from django.contrib.auth.hashers import make_password, check_password
 
 from ..models import (
     Product, ProductCategory, Store, ProductStock,
@@ -21,10 +22,99 @@ def _save_cart(request, cart):
     request.session.modified = True
 
 
+def _get_shop_customer(request):
+    customer_id = request.session.get('shop_customer_id')
+    if not customer_id:
+        return None
+    return Customer.objects.filter(id=customer_id).first()
+
+
 def _sync_product_total_stock(product):
     total_qty = ProductStock.objects.filter(product=product).aggregate(s=Sum('quantity'))['s'] or 0
     product.stock_quantity = total_qty
     product.save(update_fields=['stock_quantity'])
+
+
+def shop_register(request):
+    if _get_shop_customer(request):
+        return redirect('shop_catalog')
+
+    if request.method == 'POST':
+        full_name = (request.POST.get('full_name') or '').strip()
+        phone = (request.POST.get('phone') or '').strip()
+        email = (request.POST.get('email') or '').strip() or None
+        password = request.POST.get('password') or ''
+        password_confirm = request.POST.get('password_confirm') or ''
+
+        if not full_name or not phone or len(password) < 4:
+            messages.error(request, 'Заповніть ПІБ, телефон та пароль (мінімум 4 символи).')
+            return redirect('shop_register')
+
+        if password != password_confirm:
+            messages.error(request, 'Паролі не збігаються.')
+            return redirect('shop_register')
+
+        existing_customer = Customer.objects.filter(phone=phone).first()
+        if existing_customer:
+            if existing_customer.password_hash:
+                messages.error(request, 'Клієнт із таким номером телефону вже зареєстрований. Увійдіть в акаунт.')
+                return redirect('shop_login')
+            existing_customer.full_name = full_name
+            if email:
+                existing_customer.email = email
+            existing_customer.password_hash = make_password(password)
+            existing_customer.save(update_fields=['full_name', 'email', 'password_hash'])
+            customer = existing_customer
+            messages.success(
+                request,
+                f'Вашу картку лояльності активовано! Поточна знижка: {customer.discount_percent:.0f}%.'
+            )
+        else:
+            customer = Customer.objects.create(
+                full_name=full_name,
+                phone=phone,
+                email=email,
+                discount_percent=Decimal('3.00'),
+                password_hash=make_password(password),
+            )
+            messages.success(request, 'Реєстрація успішна! Вам нараховано стартову знижку 3%.')
+
+        request.session['shop_customer_id'] = customer.id
+        return redirect('shop_catalog')
+
+    return render(request, 'shop/register.html', {
+        'shop_customer': None,
+        'cart_count': sum(_get_cart(request).values()),
+    })
+
+
+def shop_login(request):
+    if _get_shop_customer(request):
+        return redirect('shop_catalog')
+
+    if request.method == 'POST':
+        phone = (request.POST.get('phone') or '').strip()
+        password = request.POST.get('password') or ''
+
+        customer = Customer.objects.filter(phone=phone).first()
+        if not customer or not customer.password_hash or not check_password(password, customer.password_hash):
+            messages.error(request, 'Невірний номер телефону або пароль.')
+            return redirect('shop_login')
+
+        request.session['shop_customer_id'] = customer.id
+        messages.success(request, f'Вітаємо, {customer.full_name}!')
+        return redirect('shop_catalog')
+
+    return render(request, 'shop/login.html', {
+        'shop_customer': None,
+        'cart_count': sum(_get_cart(request).values()),
+    })
+
+
+def shop_logout(request):
+    request.session.pop('shop_customer_id', None)
+    messages.info(request, 'Ви вийшли з особистого кабінету покупця.')
+    return redirect('shop_catalog')
 
 
 def shop_catalog(request):
@@ -53,6 +143,7 @@ def shop_catalog(request):
     cart_count = sum(cart.values())
 
     return render(request, 'shop/catalog.html', {
+        'shop_customer': _get_shop_customer(request),
         'products': products,
         'categories': ProductCategory.objects.all(),
         'stores': Store.objects.all(),
@@ -102,9 +193,15 @@ def shop_cart_action(request):
 
 def shop_checkout(request):
     cart = _get_cart(request)
-    phone_lookup = (request.GET.get('phone') or request.POST.get('customer_phone') or '').strip()
+    shop_customer = _get_shop_customer(request)
 
-    customer = Customer.objects.filter(phone=phone_lookup).first() if phone_lookup else None
+    if shop_customer:
+        customer = shop_customer
+        phone_lookup = shop_customer.phone
+    else:
+        phone_lookup = (request.GET.get('phone') or request.POST.get('customer_phone') or '').strip()
+        customer = Customer.objects.filter(phone=phone_lookup).first() if phone_lookup else None
+
     customer_discount = get_customer_discount(customer) if customer else Decimal('0.00')
 
     cart_items = []
@@ -144,7 +241,7 @@ def shop_checkout(request):
             return redirect('shop_catalog')
 
         customer_name = (request.POST.get('customer_name') or '').strip()
-        customer_phone = (request.POST.get('customer_phone') or '').strip()
+        customer_phone = shop_customer.phone if shop_customer else (request.POST.get('customer_phone') or '').strip()
         delivery_type = request.POST.get('delivery_type', 'самовивіз')
         pickup_store_id = request.POST.get('pickup_store_id') or None
         delivery_address = (request.POST.get('delivery_address') or '').strip()
@@ -165,13 +262,16 @@ def shop_checkout(request):
 
         try:
             with transaction.atomic():
-                customer_obj, created = Customer.objects.get_or_create(
-                    phone=customer_phone,
-                    defaults={
-                        'full_name': customer_name,
-                        'discount_percent': Decimal('3.00'),
-                    }
-                )
+                if shop_customer:
+                    customer_obj = shop_customer
+                else:
+                    customer_obj, created = Customer.objects.get_or_create(
+                        phone=customer_phone,
+                        defaults={
+                            'full_name': customer_name,
+                            'discount_percent': Decimal('3.00'),
+                        }
+                    )
                 cust_disc = get_customer_discount(customer_obj)
 
                 order = OnlineOrder.objects.create(
@@ -251,10 +351,9 @@ def shop_checkout(request):
             _save_cart(request, {})
             messages.success(
                 request,
-                f'Ваше замовлення №{order.id} на суму {order.total} грн успішно оформлено! '
-                f'Ви можете відстежувати його статус за номером телефону {customer_phone}.'
+                f'Ваше замовлення №{order.id} на суму {order.total} грн успішно оформлено!'
             )
-            return redirect(f'/shop/orders/?phone={customer_phone}')
+            return redirect('shop_my_orders') if shop_customer else redirect(f'/shop/orders/?phone={customer_phone}')
 
         except ValueError as e:
             messages.error(request, str(e))
@@ -262,6 +361,7 @@ def shop_checkout(request):
 
     pickup_stores = Store.objects.filter(type='магазин')
     return render(request, 'shop/checkout.html', {
+        'shop_customer': shop_customer,
         'cart_items': cart_items,
         'subtotal': subtotal,
         'total_with_discount': total_with_discount,
@@ -275,12 +375,14 @@ def shop_checkout(request):
 
 
 def shop_my_orders(request):
-    phone = (request.GET.get('phone') or '').strip()
+    shop_customer = _get_shop_customer(request)
+    phone = shop_customer.phone if shop_customer else (request.GET.get('phone') or '').strip()
     orders = []
-    customer = None
+    customer = shop_customer
 
     if phone:
-        customer = Customer.objects.filter(phone=phone).first()
+        if not customer:
+            customer = Customer.objects.filter(phone=phone).first()
         orders = (
             OnlineOrder.objects
             .select_related('pickup_store')
@@ -291,6 +393,7 @@ def shop_my_orders(request):
 
     cart = _get_cart(request)
     return render(request, 'shop/my_orders.html', {
+        'shop_customer': shop_customer,
         'phone': phone,
         'customer': customer,
         'orders': orders,

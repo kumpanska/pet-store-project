@@ -13,32 +13,60 @@
         <div class="form-row">
             <div class="form-group">
                 <label>ПІБ клієнта</label>
-                <input type="text" name="full_name" class="form-control" required>
+                <input type="text" name="full_name" class="form-control" placeholder="Іваненко Олена Сергіївна" required>
             </div>
             <div class="form-group">
                 <label>Телефон</label>
-                <input type="text" name="phone" class="form-control" required>
+                <input type="text" name="phone" class="form-control" placeholder="+380..." required>
             </div>
             <div class="form-group">
                 <label>Email (необов'язково)</label>
-                <input type="email" name="email" class="form-control">
-            </div>
-            <div class="form-group">
-                <label>Персональна знижка (%)</label>
-                <select name="discount_percent" class="form-control" required>
-                    <option value="3.00" selected>3% (до 5 000 грн)</option>
-                    <option value="5.00">5% (від 5 000 грн)</option>
-                    <option value="10.00">10% (від 15 000 грн)</option>
-                </select>
+                <input type="email" name="email" class="form-control" placeholder="client@example.com">
             </div>
         </div>
+
+        <div class="form-group">
+            <label>Персональна знижка (%)</label>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px;">
+                <label style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid #cbd5e1; border-radius: 8px; cursor: pointer; background: #f8f9fa; font-weight: 500;">
+                    <input type="radio" name="discount_percent" value="3.00" checked>
+                    <span><strong>3%</strong> — базовий рівень (до 5 000 грн)</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid #cbd5e1; border-radius: 8px; cursor: pointer; background: #f8f9fa; font-weight: 500;">
+                    <input type="radio" name="discount_percent" value="5.00">
+                    <span><strong>5%</strong> — постійний клієнт (від 5 000 грн)</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; border: 1px solid #cbd5e1; border-radius: 8px; cursor: pointer; background: #f8f9fa; font-weight: 500;">
+                    <input type="radio" name="discount_percent" value="10.00">
+                    <span><strong>10%</strong> — VIP-клієнт (від 15 000 грн)</span>
+                </label>
+            </div>
+        </div>
+
         <button type="submit" class="btn btn-primary">Додати клієнта</button>
     </form>
 </div>
 
 <div class="card">
     <h3>Зареєстровані покупці</h3>
-    <table>
+
+    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;">
+        <input type="text"
+               id="customers-search"
+               class="form-control"
+               style="max-width: 360px;"
+               placeholder="🔍 Пошук за ПІБ, телефоном або email..."
+               oninput="filterCustomers()">
+
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-primary discount-filter-btn" data-discount="all" onclick="setDiscountFilter('all', this)">Усі</button>
+            <button type="button" class="btn btn-secondary discount-filter-btn" data-discount="3" onclick="setDiscountFilter('3', this)">3%</button>
+            <button type="button" class="btn btn-secondary discount-filter-btn" data-discount="5" onclick="setDiscountFilter('5', this)">5%</button>
+            <button type="button" class="btn btn-secondary discount-filter-btn" data-discount="10" onclick="setDiscountFilter('10', this)">10%</button>
+        </div>
+    </div>
+
+    <table id="customers-table">
         <thead>
             <tr>
                 <th>ПІБ</th>
@@ -50,8 +78,8 @@
         </thead>
         <tbody>
             {% for c in customers %}
-            <tr>
-                <td>{{ c.full_name }}</td>
+            <tr class="customer-row" data-discount="{{ c.discount_percent|floatformat:0 }}">
+                <td><strong>{{ c.full_name }}</strong></td>
                 <td>{{ c.phone }}</td>
                 <td>{{ c.email|default:"—" }}</td>
                 <td>{{ c.net_spent|floatformat:2 }} грн</td>
@@ -65,4 +93,26 @@
         </tbody>
     </table>
 </div>
+
+<script>
+    let activeDiscountFilter = 'all';
+
+    function setDiscountFilter(discount, btn) {
+        activeDiscountFilter = discount;
+        document.querySelectorAll('.discount-filter-btn').forEach(b => {
+            b.className = 'btn btn-secondary discount-filter-btn';
+        });
+        btn.className = 'btn btn-primary discount-filter-btn';
+        filterCustomers();
+    }
+
+    function filterCustomers() {
+        const query = document.getElementById('customers-search').value.toLowerCase().trim();
+        document.querySelectorAll('#customers-table .customer-row').forEach(row => {
+            const textMatch = row.textContent.toLowerCase().includes(query);
+            const discountMatch = activeDiscountFilter === 'all' || row.dataset.discount === activeDiscountFilter;
+            row.style.display = (textMatch && discountMatch) ? '' : 'none';
+        });
+    }
+</script>
 {% endblock %}

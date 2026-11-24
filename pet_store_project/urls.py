@@ -14,7 +14,6 @@ urlpatterns = [
     path('director/', views.director_dashboard, name='director_dashboard'),
     path('director/employees/', views.director_employees, name='director_employees'),
     path('director/stores/', views.director_stores, name='director_stores'),
-    path('director/salaries/', views.director_salaries_view, name='director_salaries'),
     path('director/analytics/', views.director_analytics, name='director_analytics'),
 
     path('cashier/', views.cashier_dashboard, name='cashier_dashboard'),
@@ -44,7 +43,11 @@ urlpatterns = [
     path('shop/cart/', shop_cart_action, name='shop_cart_action'),
     path('shop/checkout/', shop_checkout, name='shop_checkout'),
     path('shop/orders/', shop_my_orders, name='shop_my_orders'),
+path('shop/register/', views.shop_register, name='shop_register'),
+path('shop/login/', views.shop_login, name='shop_login'),
+path('shop/logout/', views.shop_logout, name='shop_logout'),
 
     # Інтернет-замовлення для персоналу
     path('cashier/online-orders/', manage_online_orders, name='manage_online_orders'),
+
 ]

@@ -87,13 +87,41 @@ def price_control(request):
         messages.success(request, f'Ціну на "{product.name}" змінено з {old_price} на {new_price} грн.')
         return redirect('price_control')
 
+    date_from_str = (request.GET.get('date_from') or '').strip()
+    date_to_str = (request.GET.get('date_to') or '').strip()
+    date_from = None
+    date_to = None
+    try:
+        if date_from_str:
+            date_from = date.fromisoformat(date_from_str)
+    except ValueError:
+        date_from_str = ''
+    try:
+        if date_to_str:
+            date_to = date.fromisoformat(date_to_str)
+    except ValueError:
+        date_to_str = ''
+
+    active_promos = list(ACTIVE_PROMO_DISCOUNTS.values())
+    history_qs = PriceChange.objects.select_related('product', 'employee').order_by('-change_date', '-id')
+
+    if date_from:
+        history_qs = history_qs.filter(change_date__gte=date_from)
+        active_promos = [p for p in active_promos if p['end_date'] >= date_from]
+    if date_to:
+        history_qs = history_qs.filter(change_date__lte=date_to)
+        active_promos = [p for p in active_promos if p['start_date'] <= date_to]
+    if not date_from and not date_to:
+        history_qs = history_qs[:20]
+
     products = Product.objects.select_related('category').all()
     categories = ProductCategory.objects.all()
-    history = PriceChange.objects.select_related('product', 'employee').order_by('-change_date', '-id')[:20]
     return render(request, 'shared/prices.html', {
         'products': products,
         'categories': categories,
-        'active_promos': list(ACTIVE_PROMO_DISCOUNTS.values()),
-        'history': history,
+        'active_promos': active_promos,
+        'history': history_qs,
+        'date_from': date_from_str,
+        'date_to': date_to_str,
         'account': request.user_account
     })

@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import F, ExpressionWrapper, DecimalField
 from django.utils import timezone
+from decimal import Decimal
 
 class ProductCategory(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -31,9 +32,9 @@ class Supplier(models.Model):
 class Customer(models.Model):
     full_name = models.CharField(max_length=150)
     phone = models.CharField(max_length=20, unique=True)
-    email = models.CharField(max_length=100, unique=True, blank=True, null=True)
-    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-
+    email = models.EmailField(blank=True, null=True)
+    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default='3.00')
+    password_hash = models.CharField(max_length=255, blank=True, null=True)
     class Meta:
         managed = False
         db_table = 'customer'

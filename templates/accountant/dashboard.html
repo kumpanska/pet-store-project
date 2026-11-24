@@ -6,9 +6,28 @@
     <h1>Фінансовий облік та звітність</h1>
 </div>
 
+<div class="card">
+    <form method="GET" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 0.85em;">Період з:</label>
+            <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 0.85em;">по:</label>
+            <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+        </div>
+        <button type="submit" class="btn btn-primary">Показати історію</button>
+        {% if date_from or date_to %}
+            <a href="{{ request.path }}" class="btn btn-secondary">Скинути фільтр</a>
+        {% endif %}
+    </form>
+</div>
+
 <div class="stats-grid" style="max-width: 720px;">
     <div class="stat-card">
-        <div class="label">Чиста виручка за поточний місяць</div>
+        <div class="label">
+            {% if date_from or date_to %}Чиста виручка за обраний період{% else %}Чиста виручка за поточний місяць{% endif %}
+        </div>
         <div class="value">{{ month_net_revenue|floatformat:2 }} ₴</div>
     </div>
     <div class="stat-card">
@@ -37,7 +56,7 @@
                 <td><strong>{{ p.amount }} ₴</strong></td>
             </tr>
             {% empty %}
-            <tr><td colspan="4">Оплат ще не зафіксовано.</td></tr>
+            <tr><td colspan="4">Оплат за обраний період не знайдено.</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -48,7 +67,7 @@
     <table>
         <thead>
             <tr>
-                <th>Період</th>
+                <th>Дата нарахування</th>
                 <th>Співробітник</th>
                 <th>Ставка</th>
                 <th>Премія</th>
@@ -58,14 +77,14 @@
         <tbody>
             {% for s in recent_salaries %}
             <tr>
-                <td>{{ s.period_month|date:"m.Y" }}</td>
+                <td><strong>{{ s.period_month|date:"d.m.Y" }}</strong></td>
                 <td><strong>{{ s.employee.full_name }}</strong></td>
                 <td>{{ s.base_amount }} ₴</td>
                 <td>{{ s.bonus }} ₴</td>
                 <td><strong>{{ s.total }} ₴</strong></td>
             </tr>
             {% empty %}
-            <tr><td colspan="5">Нарахувань ще не було.</td></tr>
+            <tr><td colspan="5">Нарахувань за обраний період не знайдено.</td></tr>
             {% endfor %}
         </tbody>
     </table>

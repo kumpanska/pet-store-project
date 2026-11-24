@@ -5,13 +5,30 @@ from django.db import transaction, IntegrityError
 from django.db.models.deletion import ProtectedError
 from django.contrib import messages
 
-
 from ..models import (
     Product, ProductCategory, Supplier, Store, GoodsReceipt, GoodsReceiptItem,
     InventoryCheck, StockTransfer, WriteOffAct, WriteOffItem,
     SupplierOrder, SupplierOrderItem
 )
 from ..permissions import role_required
+
+
+def _parse_date_range(request):
+    date_from_str = (request.GET.get('date_from') or '').strip()
+    date_to_str = (request.GET.get('date_to') or '').strip()
+    date_from = None
+    date_to = None
+    try:
+        if date_from_str:
+            date_from = date.fromisoformat(date_from_str)
+    except ValueError:
+        date_from_str = ''
+    try:
+        if date_to_str:
+            date_to = date.fromisoformat(date_to_str)
+    except ValueError:
+        date_to_str = ''
+    return date_from, date_to, date_from_str, date_to_str
 
 
 @role_required(['менеджер'])
@@ -142,11 +159,17 @@ def manager_catalog(request):
                 )
             return redirect('manager_catalog')
 
+    selected_category = (request.GET.get('category_id') or '').strip()
+    products_qs = Product.objects.select_related('category', 'supplier').all().order_by('name')
+    if selected_category:
+        products_qs = products_qs.filter(category_id=selected_category)
+
     return render(request, 'manager/catalog.html', {
         'account': request.user_account,
-        'products': Product.objects.select_related('category', 'supplier').all().order_by('name'),
-        'categories': ProductCategory.objects.all(),
+        'products': products_qs,
+        'categories': ProductCategory.objects.all().order_by('name'),
         'suppliers': Supplier.objects.all(),
+        'selected_category': selected_category,
         'today': date.today(),
     })
 
@@ -183,11 +206,22 @@ def manager_inventory(request):
         )
         return redirect('manager_inventory')
 
-    checks = InventoryCheck.objects.select_related('product', 'employee').order_by('-date', '-id')[:30]
+    date_from, date_to, date_from_str, date_to_str = _parse_date_range(request)
+    checks_qs = InventoryCheck.objects.select_related('product', 'employee').order_by('-date', '-id')
+    if date_from:
+        checks_qs = checks_qs.filter(date__gte=date_from)
+    if date_to:
+        checks_qs = checks_qs.filter(date__lte=date_to)
+    if not date_from and not date_to:
+        checks_qs = checks_qs[:30]
+
     return render(request, 'manager/inventory.html', {
         'account': request.user_account,
-        'products': Product.objects.all().order_by('name'),
-        'checks': checks,
+        'categories': ProductCategory.objects.all().order_by('name'),
+        'products': Product.objects.select_related('category').all().order_by('name'),
+        'checks': checks_qs,
+        'date_from': date_from_str,
+        'date_to': date_to_str,
     })
 
 
@@ -226,12 +260,22 @@ def manager_transfers(request):
         messages.success(request, f'Переміщення товару "{product.name}" ({qty} шт.) оформлено.')
         return redirect('manager_transfers')
 
-    transfers = StockTransfer.objects.select_related('from_store', 'to_store', 'product', 'employee').order_by('-date', '-id')[:30]
+    date_from, date_to, date_from_str, date_to_str = _parse_date_range(request)
+    transfers_qs = StockTransfer.objects.select_related('from_store', 'to_store', 'product', 'employee').order_by('-date', '-id')
+    if date_from:
+        transfers_qs = transfers_qs.filter(date__gte=date_from)
+    if date_to:
+        transfers_qs = transfers_qs.filter(date__lte=date_to)
+    if not date_from and not date_to:
+        transfers_qs = transfers_qs[:30]
+
     return render(request, 'manager/transfers.html', {
         'account': request.user_account,
         'stores': Store.objects.all(),
         'products': Product.objects.filter(stock_quantity__gt=0),
-        'transfers': transfers,
+        'transfers': transfers_qs,
+        'date_from': date_from_str,
+        'date_to': date_to_str,
     })
 
 
@@ -282,11 +326,21 @@ def manager_write_offs(request):
         except ValueError as e:
             messages.error(request, str(e))
 
-    acts = WriteOffAct.objects.select_related('employee').prefetch_related('items__product').order_by('-date', '-id')[:20]
+    date_from, date_to, date_from_str, date_to_str = _parse_date_range(request)
+    acts_qs = WriteOffAct.objects.select_related('employee').prefetch_related('items__product').order_by('-date', '-id')
+    if date_from:
+        acts_qs = acts_qs.filter(date__gte=date_from)
+    if date_to:
+        acts_qs = acts_qs.filter(date__lte=date_to)
+    if not date_from and not date_to:
+        acts_qs = acts_qs[:20]
+
     return render(request, 'manager/write_offs.html', {
         'account': request.user_account,
         'products': Product.objects.filter(stock_quantity__gt=0),
-        'acts': acts,
+        'acts': acts_qs,
+        'date_from': date_from_str,
+        'date_to': date_to_str,
     })
 
 
@@ -375,11 +429,27 @@ def manager_suppliers(request):
                 messages.success(request, f'Статус замовлення №{order.id} змінено на "{new_status}".')
             return redirect('manager_suppliers')
 
+    date_from, date_to, date_from_str, date_to_str = _parse_date_range(request)
+
+    orders_qs = SupplierOrder.objects.select_related('supplier').prefetch_related('items__product').order_by('-date', '-id')
+    receipts_qs = GoodsReceipt.objects.select_related('supplier').order_by('-date', '-id')
+    if date_from:
+        orders_qs = orders_qs.filter(date__gte=date_from)
+        receipts_qs = receipts_qs.filter(date__gte=date_from)
+    if date_to:
+        orders_qs = orders_qs.filter(date__lte=date_to)
+        receipts_qs = receipts_qs.filter(date__lte=date_to)
+    if not date_from and not date_to:
+        orders_qs = orders_qs[:25]
+        receipts_qs = receipts_qs[:20]
+
     return render(request, 'manager/suppliers.html', {
         'account': request.user_account,
         'suppliers': Supplier.objects.all(),
         'products': Product.objects.select_related('supplier').all(),
         'low_stock_products': Product.objects.select_related('supplier').filter(stock_quantity__lt=5),
-        'orders': SupplierOrder.objects.select_related('supplier').prefetch_related('items__product').order_by('-date', '-id')[:25],
-        'receipts_history': GoodsReceipt.objects.select_related('supplier').order_by('-date', '-id')[:20],
+        'orders': orders_qs,
+        'receipts_history': receipts_qs,
+        'date_from': date_from_str,
+        'date_to': date_to_str,
     })

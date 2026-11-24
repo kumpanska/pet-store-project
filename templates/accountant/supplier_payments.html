@@ -13,15 +13,13 @@
         <div class="form-row">
             <div class="form-group">
                 <label>Прибуткова накладна</label>
-               <select name="goods_receipt_id" id="receipt-select" class="form-control" onchange="syncMaxPaymentAmount()" required>
+                <select name="goods_receipt_id" id="receipt-select" class="form-control" onchange="syncMaxPaymentAmount()" required>
                     <option value="">-- Оберіть перевірену накладну до сплати --</option>
-                    {% for r in receipts %}
-                        {% if r.balance_due > 0 and r.is_verified %}
-                            <option value="{{ r.id }}" data-balance="{{ r.balance_due|stringformat:'s' }}">
-                                Накладна #{{ r.id }} ({{ r.date|date:"d.m.Y" }}) — {{ r.supplier.company_name }}
-                                [✅ Перевірено] — До сплати: {{ r.balance_due }} ₴
-                            </option>
-                        {% endif %}
+                    {% for r in unpaid_verified_receipts %}
+                        <option value="{{ r.id }}" data-balance="{{ r.balance_due|stringformat:'s' }}">
+                            Накладна #{{ r.id }} ({{ r.date|date:"d.m.Y" }}) — {{ r.supplier.company_name }}
+                            [✅ Перевірено] — До сплати: {{ r.balance_due }} ₴
+                        </option>
                     {% endfor %}
                 </select>
             </div>
@@ -42,6 +40,23 @@
             <input type="text" name="note" class="form-control" placeholder="Номер платіжного доручення або коментар">
         </div>
         <button type="submit" class="btn btn-primary">Зареєструвати оплату</button>
+    </form>
+</div>
+
+<div class="card">
+    <form method="GET" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 0.85em;">Період історії з:</label>
+            <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 0.85em;">по:</label>
+            <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+        </div>
+        <button type="submit" class="btn btn-primary">Показати історію</button>
+        {% if date_from or date_to %}
+            <a href="{{ request.path }}" class="btn btn-secondary">Скинути фільтр</a>
+        {% endif %}
     </form>
 </div>
 
@@ -89,7 +104,7 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="6">Прибуткових накладних ще немає.</td></tr>
+            <tr><td colspan="6">Прибуткових накладних за обраний період не знайдено.</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -119,7 +134,7 @@
                 <td><strong>{{ p.amount }} ₴</strong></td>
             </tr>
             {% empty %}
-            <tr><td colspan="6">Платежів ще не проведено.</td></tr>
+            <tr><td colspan="6">Платежів за обраний період не знайдено.</td></tr>
             {% endfor %}
         </tbody>
     </table>

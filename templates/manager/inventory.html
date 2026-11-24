@@ -11,11 +11,23 @@
     <form method="POST">
         {% csrf_token %}
         <div class="form-row">
+            <div class="form-group" style="max-width: 280px;">
+                <label>Категорія товару</label>
+                <select id="inventory-category-select" class="form-control" onchange="filterInventoryProducts()">
+                    <option value="">-- Усі категорії --</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
             <div class="form-group">
                 <label>Товар</label>
-                <select name="product_id" class="form-control" required>
+                <select name="product_id" id="inventory-product-select" class="form-control" required>
+                    <option value="" id="empty-product-option"></option>
                     {% for p in products %}
-                        <option value="{{ p.id }}">{{ p.name }} [{{ p.barcode }}] — За обліком: {{ p.stock_quantity }} шт.</option>
+                        <option value="{{ p.id }}" data-category="{{ p.category_id }}">
+                            {{ p.name }} [{{ p.barcode }}] — За обліком: {{ p.stock_quantity }} шт.
+                        </option>
                     {% endfor %}
                 </select>
             </div>
@@ -30,6 +42,22 @@
 
 <div class="card">
     <h3>📋 Історія інвентаризацій</h3>
+
+    <form method="GET" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; background: #f8f9fa; padding: 12px; border-radius: 8px;">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 0.85em;">Період з:</label>
+            <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 0.85em;">по:</label>
+            <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+        </div>
+        <button type="submit" class="btn btn-primary">Показати історію</button>
+        {% if date_from or date_to %}
+            <a href="{{ request.path }}" class="btn btn-secondary">Скинути фільтр</a>
+        {% endif %}
+    </form>
+
     <table>
         <thead>
             <tr>
@@ -50,9 +78,43 @@
                 <td>{{ c.employee.full_name }}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="5">Актів інвентаризації ще немає.</td></tr>
+            <tr><td colspan="5">Актів інвентаризації за обраний період не знайдено.</td></tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+<script>
+    function filterInventoryProducts() {
+        const selectedCatId = document.getElementById('inventory-category-select').value;
+        const productSelect = document.getElementById('inventory-product-select');
+        const emptyOption = document.getElementById('empty-product-option');
+        let firstVisibleIndex = -1;
+
+        Array.from(productSelect.options).forEach((opt, idx) => {
+            if (opt.id === 'empty-product-option') return;
+            const matches = !selectedCatId || opt.dataset.category === selectedCatId;
+            opt.hidden = !matches;
+            opt.disabled = !matches;
+            if (matches && firstVisibleIndex === -1) {
+                firstVisibleIndex = idx;
+            }
+        });
+
+        if (firstVisibleIndex === -1) {
+            emptyOption.hidden = false;
+            emptyOption.disabled = false;
+            productSelect.selectedIndex = 0;
+        } else {
+            emptyOption.hidden = true;
+            emptyOption.disabled = true;
+            const currentOpt = productSelect.options[productSelect.selectedIndex];
+            if (!currentOpt || currentOpt.hidden || currentOpt.id === 'empty-product-option') {
+                productSelect.selectedIndex = firstVisibleIndex;
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', filterInventoryProducts);
+</script>
 {% endblock %}

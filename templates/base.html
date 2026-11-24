@@ -29,7 +29,6 @@
                 <li><a href="{% url 'director_analytics' %}">📈 Аналітика та звіти</a></li>
                 <li><a href="{% url 'director_employees' %}">👥 Персонал та доступи</a></li>
                 <li><a href="{% url 'director_stores' %}">🏪 Магазини та склади</a></li>
-                <li><a href="{% url 'director_salaries' %}">💳 Відомість зарплат</a></li>
 
             {% elif account.role.name == 'продавець-консультант' %}
                 <li><a href="{% url 'cashier_dashboard' %}">🖥️ Касова зміна</a></li>

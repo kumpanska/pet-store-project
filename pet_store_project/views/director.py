@@ -188,23 +188,6 @@ def director_stores(request):
 
 
 @role_required(['директор'])
-def director_salaries_view(request):
-    salaries = (
-        Salary.objects
-        .select_related('employee__store')
-        .filter(employee__useraccount__is_active=True)
-        .order_by('-period_month', 'employee__full_name')
-    )
-    total_payroll = salaries.aggregate(total_sum=Sum('total'))['total_sum'] or Decimal('0.00')
-
-    return render(request, 'director/salaries.html', {
-        'account': request.user_account,
-        'salaries': salaries,
-        'total_payroll': total_payroll
-    })
-
-
-@role_required(['директор'])
 def director_analytics(request):
     today = date.today()
     date_from_str = request.GET.get('date_from') or today.replace(day=1).isoformat()

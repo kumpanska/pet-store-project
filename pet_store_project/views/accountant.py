@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from django.shortcuts import render, redirect, get_object_or_404
+from django.db import IntegrityError
 from django.db.models import Sum, F, ExpressionWrapper, DecimalField
 from django.contrib import messages
 
@@ -12,11 +13,55 @@ from ..permissions import role_required
 from .helpers import calculate_returns_sum
 
 
+def _parse_date_range(request):
+    date_from_str = (request.GET.get('date_from') or '').strip()
+    date_to_str = (request.GET.get('date_to') or '').strip()
+    date_from = None
+    date_to = None
+    try:
+        if date_from_str:
+            date_from = date.fromisoformat(date_from_str)
+    except ValueError:
+        date_from_str = ''
+    try:
+        if date_to_str:
+            date_to = date.fromisoformat(date_to_str)
+    except ValueError:
+        date_to_str = ''
+    return date_from, date_to, date_from_str, date_to_str
+
+
 @role_required(['бухгалтер'])
 def accountant_dashboard(request):
     today = date.today()
-    month_sales = Sale.objects.filter(date__year=today.year, date__month=today.month).aggregate(s=Sum('total'))['s'] or Decimal('0.00')
-    month_returns = calculate_returns_sum(ReturnProduct.objects.filter(date__year=today.year, date__month=today.month))
+    date_from, date_to, date_from_str, date_to_str = _parse_date_range(request)
+
+    sales_qs = Sale.objects.all()
+    returns_qs = ReturnProduct.objects.all()
+    payments_qs = SupplierPayment.objects.select_related('supplier', 'goods_receipt').order_by('-date', '-id')
+    salaries_qs = Salary.objects.select_related('employee').order_by('-period_month', '-id')
+
+    if date_from or date_to:
+        if date_from:
+            sales_qs = sales_qs.filter(date__gte=date_from)
+            returns_qs = returns_qs.filter(date__gte=date_from)
+            payments_qs = payments_qs.filter(date__gte=date_from)
+            salaries_qs = salaries_qs.filter(period_month__gte=date_from)
+        if date_to:
+            sales_qs = sales_qs.filter(date__lte=date_to)
+            returns_qs = returns_qs.filter(date__lte=date_to)
+            payments_qs = payments_qs.filter(date__lte=date_to)
+            salaries_qs = salaries_qs.filter(period_month__lte=date_to)
+        recent_payments = payments_qs
+        recent_salaries = salaries_qs
+    else:
+        sales_qs = sales_qs.filter(date__year=today.year, date__month=today.month)
+        returns_qs = returns_qs.filter(date__year=today.year, date__month=today.month)
+        recent_payments = payments_qs[:10]
+        recent_salaries = salaries_qs[:10]
+
+    month_sales = sales_qs.aggregate(s=Sum('total'))['s'] or Decimal('0.00')
+    month_returns = calculate_returns_sum(returns_qs)
 
     receipts = GoodsReceipt.objects.all()
     total_payable = sum((max(Decimal('0.00'), r.total - r.discrepancy_amount) for r in receipts), Decimal('0.00'))
@@ -27,8 +72,10 @@ def accountant_dashboard(request):
         'account': request.user_account,
         'month_net_revenue': month_sales - month_returns,
         'debt_to_suppliers': debt_to_suppliers,
-        'recent_payments': SupplierPayment.objects.select_related('supplier', 'goods_receipt').order_by('-date', '-id')[:10],
-        'recent_salaries': Salary.objects.select_related('employee').order_by('-period_month')[:10],
+        'recent_payments': recent_payments,
+        'recent_salaries': recent_salaries,
+        'date_from': date_from_str,
+        'date_to': date_to_str,
     })
 
 
@@ -76,19 +123,40 @@ def accountant_supplier_payments(request):
         )
         return redirect('accountant_supplier_payments')
 
-    receipts = list(GoodsReceipt.objects.select_related('supplier', 'verified_by').order_by('-date', '-id'))
-    for r in receipts:
+    date_from, date_to, date_from_str, date_to_str = _parse_date_range(request)
+
+    all_receipts = list(GoodsReceipt.objects.select_related('supplier', 'verified_by').order_by('-date', '-id'))
+    unpaid_verified_receipts = []
+    for r in all_receipts:
         paid = SupplierPayment.objects.filter(goods_receipt=r).aggregate(s=Sum('amount'))['s'] or Decimal('0.00')
         net_total = max(Decimal('0.00'), r.total - r.discrepancy_amount)
         r.paid_amount = paid
         r.net_total = net_total
         r.balance_due = max(Decimal('0.00'), net_total - paid)
+        if r.balance_due > 0 and r.is_verified:
+            unpaid_verified_receipts.append(r)
 
-    payments = SupplierPayment.objects.select_related('supplier', 'goods_receipt').order_by('-date', '-id')[:30]
+    filtered_receipts = all_receipts
+    if date_from:
+        filtered_receipts = [r for r in filtered_receipts if r.date >= date_from]
+    if date_to:
+        filtered_receipts = [r for r in filtered_receipts if r.date <= date_to]
+
+    payments = SupplierPayment.objects.select_related('supplier', 'goods_receipt').order_by('-date', '-id')
+    if date_from:
+        payments = payments.filter(date__gte=date_from)
+    if date_to:
+        payments = payments.filter(date__lte=date_to)
+    if not date_from and not date_to:
+        payments = payments[:30]
+
     return render(request, 'accountant/supplier_payments.html', {
         'account': request.user_account,
-        'receipts': receipts,
+        'receipts': filtered_receipts,
+        'unpaid_verified_receipts': unpaid_verified_receipts,
         'payments': payments,
+        'date_from': date_from_str,
+        'date_to': date_to_str,
     })
 
 
@@ -106,7 +174,7 @@ def accountant_salaries(request):
             if len(period_str) == 7:
                 period_date = datetime.strptime(period_str + '-01', '%Y-%m-%d').date()
             else:
-                period_date = datetime.strptime(period_str, '%Y-%m-%d').date().replace(day=1)
+                period_date = datetime.strptime(period_str, '%Y-%m-%d').date()
 
             base_amount = Decimal(request.POST.get('base_amount', '0'))
             auto_bonus_pct = Decimal(request.POST.get('sales_bonus_percent', '0'))
@@ -117,7 +185,19 @@ def accountant_salaries(request):
             if auto_bonus_pct not in ALLOWED_BONUS_PERCENTS:
                 raise ValueError
         except (InvalidOperation, ValueError, TypeError):
-            messages.error(request, 'Перевірте коректність введених сум, відсотка премії та періоду.')
+            messages.error(request, 'Перевірте коректність введених сум, відсотка премії та дати.')
+            return redirect('accountant_salaries')
+
+        existing = Salary.objects.filter(
+            employee=emp,
+            period_month__year=period_date.year,
+            period_month__month=period_date.month
+        ).first()
+        if existing:
+            messages.error(
+                request,
+                f'Співробітнику {emp.full_name} за {period_date.strftime("%m.%Y")} зарплата вже нарахована ({existing.total} грн)!'
+            )
             return redirect('accountant_salaries')
 
         role_name = emp.useraccount.role.name.lower() if hasattr(emp, 'useraccount') else ''
@@ -132,18 +212,26 @@ def accountant_salaries(request):
 
         calculated_bonus = round((emp_sales * auto_bonus_pct / Decimal('100')) + manual_bonus, 2)
 
-        Salary.objects.create(
-            employee=emp,
-            period_month=period_date,
-            base_amount=base_amount,
-            bonus=calculated_bonus
-        )
-        messages.success(
-            request,
-            f'Зарплату для {emp.full_name} за {period_date.strftime("%m.%Y")} нараховано '
-            f'(ставка: {base_amount} грн + премія: {calculated_bonus} грн).'
-        )
+        try:
+            Salary.objects.create(
+                employee=emp,
+                period_month=period_date,
+                base_amount=base_amount,
+                bonus=calculated_bonus
+            )
+            messages.success(
+                request,
+                f'Зарплату для {emp.full_name} за {period_date.strftime("%d.%m.%Y")} нараховано '
+                f'(ставка: {base_amount} грн + премія: {calculated_bonus} грн).'
+            )
+        except IntegrityError:
+            messages.error(
+                request,
+                f'Зарплата для {emp.full_name} за {period_date.strftime("%m.%Y")} уже існує в базі даних.'
+            )
         return redirect('accountant_salaries')
+
+    date_from, date_to, date_from_str, date_to_str = _parse_date_range(request)
 
     employees = list(Employee.objects.select_related('store', 'useraccount__role').all())
     for emp in employees:
@@ -156,12 +244,20 @@ def accountant_salaries(request):
         ).aggregate(s=Sum('total'))['s'] or Decimal('0.00')
 
     salaries = Salary.objects.select_related('employee__store').order_by('-period_month', 'employee__full_name')
+    if date_from:
+        salaries = salaries.filter(period_month__gte=date_from)
+    if date_to:
+        salaries = salaries.filter(period_month__lte=date_to)
+
     return render(request, 'accountant/salaries.html', {
         'account': request.user_account,
         'employees': employees,
         'salaries': salaries,
-        'current_month': today.strftime('%Y-%m'),
+        'current_date': today.isoformat(),
+        'date_from': date_from_str,
+        'date_to': date_to_str,
     })
+
 
 @role_required(['бухгалтер'])
 def accountant_pnl_report(request):
@@ -201,7 +297,7 @@ def accountant_pnl_report(request):
         'cogs': cogs,
         'gross_profit': gross_profit,
         'payroll_expenses': payroll_expenses,
-        'write_offs_loss': write_offs_loss,
+        'writeoffs_loss': write_offs_loss,
         'purchases_total': purchases_total,
         'net_profit': net_profit,
     })

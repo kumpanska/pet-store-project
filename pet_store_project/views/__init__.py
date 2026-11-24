@@ -3,7 +3,6 @@ from .director import (
     director_dashboard,
     director_employees,
     director_stores,
-    director_salaries_view,
     director_analytics,
 )
 from .cashier import (
@@ -32,8 +31,6 @@ from .accountant import (
 )
 from .shared import price_control
 from .shop import (
-    shop_catalog,
-    shop_cart_action,
-    shop_checkout,
-    shop_my_orders,
+    shop_catalog, shop_cart_action, shop_checkout, shop_my_orders,
+    shop_register, shop_login, shop_logout
 )

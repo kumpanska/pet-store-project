@@ -1,0 +1,40 @@
+{% extends 'shop/base_shop.html' %}
+{% block title %}Реєстрація покупця{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 480px; margin: 32px auto;">
+    <h2>Реєстрація в програмі лояльності</h2>
+    <p style="color: #575C55; font-size: 0.9em;">
+        Отримайте стартову знижку <strong>3%</strong> одразу після реєстрації. Якщо ви вже робили покупки в нашому магазині за номером телефону — ваша накопичена знижка підтягнеться автоматично.
+    </p>
+
+    <form method="POST">
+        {% csrf_token %}
+        <div class="form-group">
+            <label>Ваше ПІБ</label>
+            <input type="text" name="full_name" class="form-control" placeholder="Іваненко Олена Сергіївна" required>
+        </div>
+        <div class="form-group">
+            <label>Номер телефону</label>
+            <input type="text" name="phone" class="form-control" placeholder="+380..." required>
+        </div>
+        <div class="form-group">
+            <label>Email (необов'язково)</label>
+            <input type="email" name="email" class="form-control" placeholder="client@example.com">
+        </div>
+        <div class="form-group">
+            <label>Пароль</label>
+            <input type="password" name="password" class="form-control" minlength="4" required>
+        </div>
+        <div class="form-group">
+            <label>Підтвердіть пароль</label>
+            <input type="password" name="password_confirm" class="form-control" minlength="4" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Зареєструватися</button>
+    </form>
+
+    <p style="margin-top: 16px; text-align: center; font-size: 0.9em;">
+        Вже зареєстровані? <a href="{% url 'shop_login' %}">Увійти</a>
+    </p>
+</div>
+{% endblock %}

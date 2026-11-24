@@ -7,7 +7,7 @@
 </div>
 
 <div class="card">
-    <h3>Нарахувати зарплату за місяць</h3>
+    <h3>Нарахувати зарплату</h3>
     <form method="POST">
         {% csrf_token %}
         <div class="form-row">
@@ -24,8 +24,8 @@
                 </select>
             </div>
             <div class="form-group" style="max-width: 240px;">
-                <label>Місяць нарахування</label>
-                <input type="month" name="period_month" class="form-control" value="{{ current_month }}" required>
+                <label>Дата нарахування</label>
+                <input type="date" name="period_month" class="form-control" value="{{ current_date }}" required>
             </div>
         </div>
         <div class="form-row">
@@ -54,10 +54,26 @@
 
 <div class="card">
     <h3>📋 Відомість нарахувань</h3>
+
+    <form method="GET" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; background: #f8f9fa; padding: 12px; border-radius: 8px;">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 0.85em;">Період з:</label>
+            <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="font-size: 0.85em;">по:</label>
+            <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+        </div>
+        <button type="submit" class="btn btn-primary">Показати історію</button>
+        {% if date_from or date_to %}
+            <a href="{{ request.path }}" class="btn btn-secondary">Скинути фільтр</a>
+        {% endif %}
+    </form>
+
     <table>
         <thead>
             <tr>
-                <th>Період</th>
+                <th>Дата нарахування</th>
                 <th>Співробітник</th>
                 <th>Точка</th>
                 <th>Ставка</th>
@@ -68,7 +84,7 @@
         <tbody>
             {% for s in salaries %}
             <tr>
-                <td>{{ s.period_month|date:"m.Y" }}</td>
+                <td><strong>{{ s.period_month|date:"d.m.Y" }}</strong></td>
                 <td><strong>{{ s.employee.full_name }}</strong></td>
                 <td>{{ s.employee.store.name|default:"Вся мережа" }}</td>
                 <td>{{ s.base_amount }} ₴</td>
@@ -76,7 +92,7 @@
                 <td><strong>{{ s.total }} ₴</strong></td>
             </tr>
             {% empty %}
-            <tr><td colspan="6">Записів ще немає.</td></tr>
+            <tr><td colspan="6">Записів за обраний період не знайдено.</td></tr>
             {% endfor %}
         </tbody>
     </table>
