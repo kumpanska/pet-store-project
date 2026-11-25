@@ -146,7 +146,7 @@ def shop_catalog(request):
         'shop_customer': _get_shop_customer(request),
         'products': products,
         'categories': ProductCategory.objects.all(),
-        'stores': Store.objects.all(),
+        'stores': Store.objects.filter(type='магазин'),
         'selected_category': category_id,
         'selected_store': store_id,
         'query': query,

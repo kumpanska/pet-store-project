@@ -21,9 +21,9 @@
             <div class="form-group">
                 <label>Наявність у магазині</label>
                 <select name="store" class="form-control">
-                    <option value="">Усі магазини та склади</option>
+                    <option value="">Усі магазини</option>
                     {% for st in stores %}
-                        <option value="{{ st.id }}" {% if st.id|stringformat:"s" == selected_store %}selected{% endif %}>{{ st.name }} ({{ st.type }})</option>
+                        <option value="{{ st.id }}" {% if st.id|stringformat:"s" == selected_store %}selected{% endif %}>{{ st.name }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -55,16 +55,18 @@
             <div class="stock-list">
                 <strong>Наявність у магазинах:</strong>
                 {% for ps in p.store_stocks.all %}
-                    <div style="display: flex; justify-content: space-between; margin-top: 3px;">
-                        <span>{{ ps.store.name }}{% if ps.store.address %} ({{ ps.store.address }}){% endif %}</span>
-                        {% if ps.quantity > 0 %}
-                            <strong style="color: #16a34a;">{{ ps.quantity }} шт.</strong>
-                        {% else %}
-                            <span style="color: #94a3b8;">Немає</span>
-                        {% endif %}
-                    </div>
+                    {% if ps.store.type == 'магазин' %}
+                        <div style="display: flex; justify-content: space-between; margin-top: 3px;">
+                            <span>{{ ps.store.name }}{% if ps.store.address %} ({{ ps.store.address }}){% endif %}</span>
+                            {% if ps.quantity > 0 %}
+                                <strong style="color: #16a34a;">{{ ps.quantity }} шт.</strong>
+                            {% else %}
+                                <span style="color: #94a3b8;">Немає</span>
+                            {% endif %}
+                        </div>
+                    {% endif %}
                 {% empty %}
-                    <div>Загальний залишок: {{ p.stock_quantity }} шт.</div>
+                    <div style="color: #94a3b8; margin-top: 3px;">Немає в магазинах</div>
                 {% endfor %}
             </div>
         </div>

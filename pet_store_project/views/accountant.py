@@ -297,7 +297,7 @@ def accountant_pnl_report(request):
         'cogs': cogs,
         'gross_profit': gross_profit,
         'payroll_expenses': payroll_expenses,
-        'writeoffs_loss': write_offs_loss,
+        'write_offs_loss': write_offs_loss,
         'purchases_total': purchases_total,
         'net_profit': net_profit,
     })
